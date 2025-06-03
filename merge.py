@@ -1,0 +1,254 @@
+from abc import ABC, abstractmethod
+import torch
+from omegaconf import DictConfig, OmegaConf
+
+def create_merge_instance(args: DictConfig):
+    """Creates and returns an instance of the merge class based on the provided configuration."""
+    method_to_class = {
+        "weight_averaging": WeightAveraging,
+        "task_arithmetic": TaskArithmetic,
+        "ties": TIES,
+    }
+    args = OmegaConf.to_container(args, resolve=True, throw_on_missing=True)
+
+    if "method" not in args:
+        raise ValueError("Merge configuration must include a 'method' key.")
+
+    method = args["method"]
+    if method not in method_to_class:
+        raise KeyError(f"Unknown merge method: {method}")
+
+    if method in args:
+        method_args = args[method]
+    else:
+        method_args = {}
+
+    method_agnostic_args = {
+        a: args[a] for a in args if a not in ["method"] + list(method_to_class.keys())
+    }
+
+    return method_to_class[method](**{**method_args, **method_agnostic_args})
+
+
+class BaseMerge(ABC):
+    """Abstract base class for merging multiple model state dictionaries."""
+
+    def __init__(self):
+        pass
+
+    def __call__(self, state_dicts, zero_shot=None):
+        """Validate and merge a list of state dictionaries."""
+        self.validate_state_dicts(state_dicts)
+        return self.merge(state_dicts, zero_shot)
+
+    @abstractmethod
+    def merge(self, state_dicts, zero_shot=None):
+        raise NotImplementedError("Merge method not implemented.")
+
+    def validate_state_dicts(self, state_dicts):
+        """Check if all dictionaries have the same keys."""
+        keys = set(state_dicts[0].keys())
+        for state_dict in state_dicts:
+            if set(state_dict.keys()) != keys:
+                raise ValueError("Cannot merge state dictionaries with unequal keys.")
+
+    def move_state_dicts_to_cpu(self, state_dicts):
+        """Move the state dictionaries to the CPU."""
+        return [
+            {k: v.cpu() for k, v in state_dict.items()} for state_dict in state_dicts
+        ]
+
+
+class BaseWeightedMerge(BaseMerge):
+    """Abstract base class for merging multiple model state dictionaries with weighted coefficients."""
+
+    def __init__(self, weight_coefficients=None):
+        """Initialize a weighted merge."""
+        super().__init__()
+        self.weight_coefficients = weight_coefficients
+        self.rebalance_weights = self.weight_coefficients==None
+
+    def set_weight_coefficients(self, weight_coefficients):
+        self.weight_coefficients = weight_coefficients
+        self.rebalance_weights = False
+
+    def _adjust_and_validate_weights(self, state_dicts):
+        """Adjust and validate the weight coefficients."""
+        if self.weight_coefficients is None or self.rebalance_weights:
+            self.weight_coefficients = [1 / len(state_dicts)] * len(state_dicts)
+
+        if not isinstance(self.weight_coefficients, list):
+            raise TypeError("Weight_coefficients must be a list of floats.")
+
+        if len(state_dicts) != len(self.weight_coefficients):
+            raise ValueError(
+                "The number of state dictionaries and weight coefficients must be the same."
+            )
+
+        if abs(sum(self.weight_coefficients) - 1.0) >= 1e-6:
+            raise ValueError(
+                f"Weight coefficients must sum to 1. Got {self.weight_coefficients}."
+            )
+
+
+class BaseTaskVectorMerge(BaseMerge):
+    """Base class for task vector based merging methods."""
+
+    def __init__(self, scaling_factor=1):
+        super().__init__()
+        self.scaling_factor = scaling_factor
+
+    def state_dict_to_vector(self, state_dict, remove_keys):
+        """Convert a state dictionary to a flattened vector."""
+        shared_state_dict = {
+            k: v for k, v in state_dict.items() if k not in remove_keys
+        }
+        return torch.nn.utils.parameters_to_vector(
+            [value.reshape(-1) for value in shared_state_dict.values()]
+        )
+
+    def vector_to_state_dict(self, vector, state_dict, remove_keys):
+        """Convert a flattened vector back to a state dictionary."""
+        reference_dict = {k: v for k, v in state_dict.items() if k not in remove_keys}
+        torch.nn.utils.vector_to_parameters(vector, reference_dict.values())
+
+        if "transformer.shared.weight" in reference_dict:
+            shared_weight = reference_dict["transformer.shared.weight"]
+            for key in remove_keys:
+                reference_dict[key] = shared_weight
+
+        return reference_dict
+
+
+class WeightAveraging(BaseWeightedMerge):
+    """Weight averaging merging technique for multiple model state dictionaries."""
+
+    def __init__(self, weight_coefficients=None):
+        """Initialize a weight averaging merge."""
+        super().__init__(weight_coefficients)
+
+    def merge(self, state_dicts, zero_shot=None):
+        """Interpolate the parameters of multiple state dictionaries."""
+        state_dicts = self.move_state_dicts_to_cpu(state_dicts)
+        self._adjust_and_validate_weights(state_dicts)
+
+        return {
+            key: sum(
+                w * state_dict[key]
+                for w, state_dict in zip(self.weight_coefficients, state_dicts)
+            )
+            for key in state_dicts[0].keys()
+        }
+
+
+class TaskArithmetic(BaseTaskVectorMerge):
+    """Task-Arithmetic merging technique."""
+
+    def __init__(self, scaling_factor=1):
+        super().__init__(scaling_factor)
+
+    def merge(self, state_dicts, zero_shot=None):
+        """Merge multiple state dictionaries using the Task-Arithmetic technique."""
+        state_dicts = self.move_state_dicts_to_cpu(state_dicts)
+
+        remove_keys = [
+            "transformer.encoder.embed_tokens.weight",
+            "transformer.decoder.embed_tokens.weight",
+        ]
+
+        ft_vectors = torch.vstack(
+            [
+                self.state_dict_to_vector(state_dict, remove_keys)
+                for state_dict in state_dicts
+            ]
+        )
+        zs_vector = self.state_dict_to_vector(zero_shot, remove_keys)
+        task_vectors = ft_vectors - zs_vector
+        merged_task_vectors = torch.sum(task_vectors, dim=0)
+
+        merged_vector = zs_vector + self.scaling_factor * merged_task_vectors
+        return self.vector_to_state_dict(merged_vector, zero_shot, remove_keys)
+
+
+class TIES(BaseTaskVectorMerge):
+    """TIES merging technique."""
+
+    def __init__(
+        self,
+        scaling_factor=1,
+        prune_percentile=0.2,
+        merge_function="mean",
+    ):
+        super().__init__(scaling_factor)
+        self.prune_percentile = prune_percentile
+        self.merge_function = merge_function
+
+    def merge(self, state_dicts, zero_shot=None):
+        """Merge multiple state dictionaries using the TIES technique."""
+        state_dicts = self.move_state_dicts_to_cpu(state_dicts)
+
+        remove_keys = [
+            "transformer.encoder.embed_tokens.weight",
+            "transformer.decoder.embed_tokens.weight",
+        ]
+
+        ft_vectors = torch.vstack(
+            [
+                self.state_dict_to_vector(state_dict, remove_keys)
+                for state_dict in state_dicts
+            ]
+        )
+        zs_vector = self.state_dict_to_vector(zero_shot, remove_keys)
+        task_vectors = ft_vectors - zs_vector
+        merged_task_vectors = self.ties_merging(task_vectors)
+
+        merged_vector = zs_vector + self.scaling_factor * merged_task_vectors
+        return self.vector_to_state_dict(merged_vector, zero_shot, remove_keys)
+
+    def ties_merging(self, task_vectors):
+        """Perform TIES merging on flattened task checkpoints."""
+        task_vectors = self.sparsify(task_vectors)
+        signs = self.resolve_sign(task_vectors)
+        return self.disjoint_merge(task_vectors, signs)
+
+    def sparsify(self, task_vectors):
+        """Apply a top-k mask to the input tensor."""
+        original_shape = task_vectors.shape
+
+        if task_vectors.dim() == 1:
+            task_vectors = task_vectors.unsqueeze(0)
+
+        num_elements = task_vectors.shape[1]
+        k = int(num_elements * self.prune_percentile)
+        kth_values, _ = task_vectors.abs().kthvalue(k, dim=1, keepdim=True)
+        mask = task_vectors.abs() >= kth_values
+        mask = (
+            mask.squeeze() if original_shape == task_vectors.squeeze().shape else mask
+        )
+        return task_vectors * mask
+
+    def resolve_sign(self, tensor):
+        """Resolve the sign of the input tensor."""
+        sign_to_mult = torch.sign(tensor.sum(dim=0))
+        sign_to_mult[sign_to_mult == 0] = torch.sign(sign_to_mult.sum())
+        return sign_to_mult
+
+    def disjoint_merge(self, tensor, signs):
+        """Perform disjoint merging on the input tensor."""
+        rows_to_keep = torch.where(signs.unsqueeze(0) > 0, tensor > 0, tensor < 0)
+        selected_entries = tensor * rows_to_keep
+
+        if self.merge_function == "mean":
+            non_zero_counts = (selected_entries != 0).sum(dim=0).float()
+            disjoint_aggs = torch.sum(selected_entries, dim=0) / torch.clamp(
+                non_zero_counts, min=1
+            )
+        elif self.merge_function == "sum":
+            disjoint_aggs = torch.sum(selected_entries, dim=0)
+        elif self.merge_function == "max":
+            disjoint_aggs = selected_entries.abs().max(dim=0)[0]
+            disjoint_aggs *= signs
+        else:
+            raise ValueError(f"Merge method {self.merge_function} is not defined.")
+
+        return disjoint_aggs
