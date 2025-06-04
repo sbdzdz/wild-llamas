@@ -20,7 +20,6 @@ def main(cfg: DictConfig):
         gated=False,
         expand=["downloads"]
     )
-    print(len(list(models)))
 
     download(base_model_id)
     base_model = AutoModelForCausalLM.from_pretrained(f"models/{base_model_id}")
@@ -50,7 +49,7 @@ def download(model_id):
     snapshot_download(
         repo_id=model_id,
         local_dir=f"models/{model_id}",
-        local_dir_use_symlinks=False
+        max_workers=1
     )
 
 def evaluate(model, tokenizer):
