@@ -4,39 +4,58 @@ import hydra
 from omegaconf import DictConfig
 from huggingface_hub import HfApi, snapshot_download
 from merge import create_merge_instance
+from copy import deepcopy
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
     api = HfApi()
-    base_model = cfg.base_model
+    base_model_id = cfg.base_model
 
     models = api.list_models(
-        filter=f"base_model:{base_model}",
+        filter=f"base_model:{base_model_id}",
         sort="downloads",
         direction=-1,
         limit=cfg.model_limit
     )
 
+    download(base_model_id)
+    base_model = AutoModelForCausalLM.from_pretrained(f"models/{base_model_id}")
+    base_model_state_dict = base_model.state_dict()
+    merger = create_merge_instance(cfg)
+
+    for model in models:
+        download(model.modelId)
+        finetuned_model = AutoModelForCausalLM.from_pretrained(f"models/{model.modelId}")
+        finetuned_model_state_dict = finetuned_model.state_dict()
+
+        merged_state_dict = deepcopy(base_model_state_dict)
+        merged_state_dict = merger.merge(merged_state_dict, finetuned_model_state_dict)
+
+        merged_model = AutoModelForCausalLM.from_pretrained(
+            f"models/{base_model_id}",
+            state_dict=merged_state_dict
+        )
+        tokenizer = AutoTokenizer.from_pretrained(f"models/{base_model_id}")
+        evaluate(merged_model, tokenizer)
+
+    print(f"Created merge instance using {cfg.merge.method} method")
+
+def download(model_id):
+    """Download a model from HuggingFace Hub."""
+    print(f"Downloading {model_id}...")
     snapshot_download(
-        repo_id=base_model,
-        local_dir=f"models/{base_model}",
+        repo_id=model_id,
+        local_dir=f"models/{model_id}",
         local_dir_use_symlinks=False
     )
 
-    for model in models:
-        print(f"Downloading {model.modelId}...")
-        try:
-            snapshot_download(
-                repo_id=model.modelId,
-                local_dir=f"models/{model.modelId}",
-                local_dir_use_symlinks=False
-            )
-            print(f"Successfully downloaded {model.modelId}")
-        except Exception as e:
-            print(f"Failed to download {model.modelId}: {str(e)}")
-
-    merger = create_merge_instance(cfg)
-    print(f"Created merge instance using {cfg.merge.method} method")
+def evaluate(model, tokenizer):
+    """Evaluate a model on a simple prompt."""
+    prompt = "What is the capital of France?"
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(inputs["input_ids"], max_new_tokens=100)
+    print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 
 
 if __name__ == "__main__":
