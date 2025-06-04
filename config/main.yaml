@@ -1,7 +1,3 @@
-defaults:
-  - merge: weight_averaging
-  - _self_
-
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
 model_limit: 5
 
