@@ -7,7 +7,7 @@ from merge import create_merge_instance
 from copy import deepcopy
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-@hydra.main(version_base=None, config_path="config", config_name="config")
+@hydra.main(version_base=None, config_path="config", config_name="main")
 def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
