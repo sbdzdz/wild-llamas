@@ -1,33 +1,22 @@
 from abc import ABC, abstractmethod
 import torch
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
-def create_merge_instance(args: DictConfig):
+def create_merge_instance(cfg: DictConfig):
     """Creates and returns an instance of the merge class based on the provided configuration."""
     method_to_class = {
         "weight_averaging": WeightAveraging,
         "task_arithmetic": TaskArithmetic,
         "ties": TIES,
     }
-    args = OmegaConf.to_container(args, resolve=True, throw_on_missing=True)
 
-    if "method" not in args:
-        raise ValueError("Merge configuration must include a 'method' key.")
-
-    method = args["method"]
+    method = cfg.merge.method
     if method not in method_to_class:
         raise KeyError(f"Unknown merge method: {method}")
 
-    if method in args:
-        method_args = args[method]
-    else:
-        method_args = {}
+    method_cfg = cfg.merge.get(method, {})
 
-    method_agnostic_args = {
-        a: args[a] for a in args if a not in ["method"] + list(method_to_class.keys())
-    }
-
-    return method_to_class[method](**{**method_args, **method_agnostic_args})
+    return method_to_class[method](**method_cfg)
 
 
 class BaseMerge(ABC):
@@ -62,6 +51,11 @@ class BaseMerge(ABC):
 class BaseTaskVectorMerge(BaseMerge):
     """Base class for task vector based merging methods."""
 
+    REMOVE_KEYS = [
+        "transformer.encoder.embed_tokens.weight",
+        "transformer.decoder.embed_tokens.weight",
+    ]
+
     def __init__(self, scaling_factor=1):
         super().__init__()
         self.scaling_factor = scaling_factor
@@ -87,6 +81,21 @@ class BaseTaskVectorMerge(BaseMerge):
 
         return reference_dict
 
+    def compute_task_vectors(self, state_dicts, zero_shot):
+        """Compute task vectors by subtracting zero-shot from fine-tuned vectors."""
+        state_dicts = self.move_state_dicts_to_cpu(state_dicts)
+
+        ft_vectors = torch.vstack(
+            [
+                self.state_dict_to_vector(state_dict, self.REMOVE_KEYS)
+                for state_dict in state_dicts
+            ]
+        )
+        zs_vector = self.state_dict_to_vector(zero_shot, self.REMOVE_KEYS)
+        task_vectors = ft_vectors - zs_vector
+
+        return task_vectors, zs_vector
+
 
 class WeightAveraging(BaseMerge):
     """Weight averaging merging technique for multiple model state dictionaries."""
@@ -110,25 +119,11 @@ class TaskArithmetic(BaseTaskVectorMerge):
 
     def merge(self, state_dicts, zero_shot=None):
         """Merge multiple state dictionaries using the Task-Arithmetic technique."""
-        state_dicts = self.move_state_dicts_to_cpu(state_dicts)
-
-        remove_keys = [
-            "transformer.encoder.embed_tokens.weight",
-            "transformer.decoder.embed_tokens.weight",
-        ]
-
-        ft_vectors = torch.vstack(
-            [
-                self.state_dict_to_vector(state_dict, remove_keys)
-                for state_dict in state_dicts
-            ]
-        )
-        zs_vector = self.state_dict_to_vector(zero_shot, remove_keys)
-        task_vectors = ft_vectors - zs_vector
+        task_vectors, zs_vector = self.compute_task_vectors(state_dicts, zero_shot)
         merged_task_vectors = torch.sum(task_vectors, dim=0)
 
         merged_vector = zs_vector + self.scaling_factor * merged_task_vectors
-        return self.vector_to_state_dict(merged_vector, zero_shot, remove_keys)
+        return self.vector_to_state_dict(merged_vector, zero_shot, self.REMOVE_KEYS)
 
 
 class TIES(BaseTaskVectorMerge):
@@ -144,25 +139,11 @@ class TIES(BaseTaskVectorMerge):
 
     def merge(self, state_dicts, zero_shot=None):
         """Merge multiple state dictionaries using the TIES technique."""
-        state_dicts = self.move_state_dicts_to_cpu(state_dicts)
-
-        remove_keys = [
-            "transformer.encoder.embed_tokens.weight",
-            "transformer.decoder.embed_tokens.weight",
-        ]
-
-        ft_vectors = torch.vstack(
-            [
-                self.state_dict_to_vector(state_dict, remove_keys)
-                for state_dict in state_dicts
-            ]
-        )
-        zs_vector = self.state_dict_to_vector(zero_shot, remove_keys)
-        task_vectors = ft_vectors - zs_vector
+        task_vectors, zs_vector = self.compute_task_vectors(state_dicts, zero_shot)
         merged_task_vectors = self.ties_merging(task_vectors)
 
         merged_vector = zs_vector + self.scaling_factor * merged_task_vectors
-        return self.vector_to_state_dict(merged_vector, zero_shot, remove_keys)
+        return self.vector_to_state_dict(merged_vector, zero_shot, self.REMOVE_KEYS)
 
     def ties_merging(self, task_vectors):
         """Perform TIES merging on flattened task checkpoints."""
