@@ -1,7 +1,7 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
 
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from huggingface_hub import HfApi, snapshot_download
 from merge import create_merge_instance
 
@@ -35,12 +35,7 @@ def main(cfg: DictConfig):
         except Exception as e:
             print(f"Failed to download {model.modelId}: {str(e)}")
 
-    merge_config = OmegaConf.create({
-        "method": cfg.merge.method,
-        cfg.merge.method: cfg.merge[cfg.merge.method]
-    })
-
-    merger = create_merge_instance(merge_config)
+    merger = create_merge_instance(cfg)
     print(f"Created merge instance using {cfg.merge.method} method")
 
 
