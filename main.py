@@ -13,11 +13,14 @@ def main(cfg: DictConfig):
     base_model_id = cfg.base_model
 
     models = api.list_models(
-        filter=f"base_model:{base_model_id}",
+        filter=f"base_model:finetune:{base_model_id}",
         sort="downloads",
         direction=-1,
-        limit=cfg.model_limit
+        limit=cfg.model_limit,
+        gated=False,
+        expand=["downloads"]
     )
+    print(len(list(models)))
 
     download(base_model_id)
     base_model = AutoModelForCausalLM.from_pretrained(f"models/{base_model_id}")
