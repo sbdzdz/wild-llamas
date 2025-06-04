@@ -59,38 +59,6 @@ class BaseMerge(ABC):
         ]
 
 
-class BaseWeightedMerge(BaseMerge):
-    """Abstract base class for merging multiple model state dictionaries with weighted coefficients."""
-
-    def __init__(self, weight_coefficients=None):
-        """Initialize a weighted merge."""
-        super().__init__()
-        self.weight_coefficients = weight_coefficients
-        self.rebalance_weights = self.weight_coefficients==None
-
-    def set_weight_coefficients(self, weight_coefficients):
-        self.weight_coefficients = weight_coefficients
-        self.rebalance_weights = False
-
-    def _adjust_and_validate_weights(self, state_dicts):
-        """Adjust and validate the weight coefficients."""
-        if self.weight_coefficients is None or self.rebalance_weights:
-            self.weight_coefficients = [1 / len(state_dicts)] * len(state_dicts)
-
-        if not isinstance(self.weight_coefficients, list):
-            raise TypeError("Weight_coefficients must be a list of floats.")
-
-        if len(state_dicts) != len(self.weight_coefficients):
-            raise ValueError(
-                "The number of state dictionaries and weight coefficients must be the same."
-            )
-
-        if abs(sum(self.weight_coefficients) - 1.0) >= 1e-6:
-            raise ValueError(
-                f"Weight coefficients must sum to 1. Got {self.weight_coefficients}."
-            )
-
-
 class BaseTaskVectorMerge(BaseMerge):
     """Base class for task vector based merging methods."""
 
@@ -120,23 +88,16 @@ class BaseTaskVectorMerge(BaseMerge):
         return reference_dict
 
 
-class WeightAveraging(BaseWeightedMerge):
+class WeightAveraging(BaseMerge):
     """Weight averaging merging technique for multiple model state dictionaries."""
 
-    def __init__(self, weight_coefficients=None):
-        """Initialize a weight averaging merge."""
-        super().__init__(weight_coefficients)
-
     def merge(self, state_dicts, zero_shot=None):
-        """Interpolate the parameters of multiple state dictionaries."""
+        """Average the parameters of multiple state dictionaries."""
         state_dicts = self.move_state_dicts_to_cpu(state_dicts)
-        self._adjust_and_validate_weights(state_dicts)
+        weight = 1.0 / len(state_dicts)
 
         return {
-            key: sum(
-                w * state_dict[key]
-                for w, state_dict in zip(self.weight_coefficients, state_dicts)
-            )
+            key: sum(weight * state_dict[key] for state_dict in state_dicts)
             for key in state_dicts[0].keys()
         }
 
@@ -177,11 +138,9 @@ class TIES(BaseTaskVectorMerge):
         self,
         scaling_factor=1,
         prune_percentile=0.2,
-        merge_function="mean",
     ):
         super().__init__(scaling_factor)
         self.prune_percentile = prune_percentile
-        self.merge_function = merge_function
 
     def merge(self, state_dicts, zero_shot=None):
         """Merge multiple state dictionaries using the TIES technique."""
@@ -238,17 +197,9 @@ class TIES(BaseTaskVectorMerge):
         rows_to_keep = torch.where(signs.unsqueeze(0) > 0, tensor > 0, tensor < 0)
         selected_entries = tensor * rows_to_keep
 
-        if self.merge_function == "mean":
-            non_zero_counts = (selected_entries != 0).sum(dim=0).float()
-            disjoint_aggs = torch.sum(selected_entries, dim=0) / torch.clamp(
-                non_zero_counts, min=1
-            )
-        elif self.merge_function == "sum":
-            disjoint_aggs = torch.sum(selected_entries, dim=0)
-        elif self.merge_function == "max":
-            disjoint_aggs = selected_entries.abs().max(dim=0)[0]
-            disjoint_aggs *= signs
-        else:
-            raise ValueError(f"Merge method {self.merge_function} is not defined.")
+        non_zero_counts = (selected_entries != 0).sum(dim=0).float()
+        disjoint_aggs = torch.sum(selected_entries, dim=0) / torch.clamp(
+            non_zero_counts, min=1
+        )
 
         return disjoint_aggs
