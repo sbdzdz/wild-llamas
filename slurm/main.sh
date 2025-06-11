@@ -6,8 +6,8 @@
 #SBATCH --time=3-00:00                                                         # Runtime in D-HH:MM
 #SBATCH --gres=gpu:1                                                           # Request 1 GPU
 #SBATCH --mem=100G                                                             # Memory pool for all cores (see also --mem-per-cpu)
-#SBATCH --output=/weka/bethge/dziadzio08/opencompass/slurm/outputs/job_%j.out  # File to which STDOUT will be written - make sure this is not on $HOME
-#SBATCH --error=/weka/bethge/dziadzio08/opencompass/slurm/outputs/job_%j.err   # File to which STDERR will be written - make sure this is not on $HOME
+#SBATCH --output=/weka/bethge/dziadzio08/wild-llamas/slurm/outputs/%j.out      # File to which STDOUT will be written - make sure this is not on $HOME
+#SBATCH --error=/weka/bethge/dziadzio08/wild-llamas/slurm/outputs/%j.err       # File to which STDERR will be written - make sure this is not on $HOME
 #SBATCH --mail-type=END,FAIL                                                   # Type of email notification- BEGIN,END,FAIL,ALL
 #SBATCH --mail-user=sebastian.dziadzio@uni-tuebingen.de                        # Email to which notifications will be sent
 
