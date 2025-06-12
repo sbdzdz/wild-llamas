@@ -22,7 +22,7 @@ def main(cfg: DictConfig):
     )
 
     download(base_model_id)
-    base_model = AutoModelForCausalLM.from_pretrained(f"models/{base_model_id}")
+    base_model = AutoModelForCausalLM.from_pretrained(f"models/{base_model_id}", device_map="cpu")
     base_model_state_dict = base_model.state_dict()
     merger = create_merge_instance(cfg)
 
@@ -39,7 +39,7 @@ def main(cfg: DictConfig):
             state_dict=merged_state_dict,
             device_map="cpu"
         )
-        tokenizer = AutoTokenizer.from_pretrained(f"models/{base_model_id}")
+        tokenizer = AutoTokenizer.from_pretrained(f"models/{base_model_id}", device_map="cpu")
         evaluate(merged_model, tokenizer)
 
     print(f"Created merge instance using {cfg.merge.method} method")
