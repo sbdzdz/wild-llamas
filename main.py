@@ -28,7 +28,7 @@ def main(cfg: DictConfig):
 
     for model in models:
         download(model.id)
-        finetuned_model = AutoModelForCausalLM.from_pretrained(f"models/{model.id}")
+        finetuned_model = AutoModelForCausalLM.from_pretrained(f"models/{model.id}", device_map="cpu")
         finetuned_model_state_dict = finetuned_model.state_dict()
 
         merged_state_dict = deepcopy(base_model_state_dict)
@@ -36,7 +36,8 @@ def main(cfg: DictConfig):
 
         merged_model = AutoModelForCausalLM.from_pretrained(
             f"models/{base_model_id}",
-            state_dict=merged_state_dict
+            state_dict=merged_state_dict,
+            device_map="cpu"
         )
         tokenizer = AutoTokenizer.from_pretrained(f"models/{base_model_id}")
         evaluate(merged_model, tokenizer)
