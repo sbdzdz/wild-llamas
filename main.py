@@ -32,7 +32,7 @@ def main(cfg: DictConfig):
         finetuned_model_state_dict = finetuned_model.state_dict()
 
         merged_state_dict = deepcopy(base_model_state_dict)
-        merged_state_dict = merger.merge(merged_state_dict, finetuned_model_state_dict)
+        merged_state_dict = merger.merge([merged_state_dict, finetuned_model_state_dict])
 
         merged_model = AutoModelForCausalLM.from_pretrained(
             f"models/{base_model_id}",
