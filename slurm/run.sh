@@ -19,4 +19,5 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 source $HOME/.bashrc
 source $HOME/wild-llamas/.venv/bin/activate
 
-python main.py
+additional_params="$@"
+python main.py $additional_params

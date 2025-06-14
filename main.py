@@ -39,7 +39,8 @@ def main(cfg: DictConfig):
             state_dict=merged_state_dict,
             device_map="cpu"
         )
-        evaluate(merged_model, tokenizer)
+        if cfg.evaluate:
+            evaluate(merged_model, tokenizer)
 
     print(f"Created merge instance using {cfg.merge.method} method")
 
