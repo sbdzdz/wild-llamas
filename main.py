@@ -51,6 +51,7 @@ def download(model_id):
         local_dir=f"models/{model_id}",
         max_workers=1
     )
+    print(f"Downloaded {model_id}.")
 
 def evaluate(model, tokenizer):
     """Evaluate a model on a simple prompt."""
