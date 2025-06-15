@@ -6,6 +6,9 @@ from huggingface_hub import HfApi, snapshot_download
 from merge import create_merge_instance
 from copy import deepcopy
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import gc
+import torch
+
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
@@ -18,41 +21,61 @@ def main(cfg: DictConfig):
         direction=-1,
         limit=cfg.model_limit,
         gated=False,
-        expand=["downloads"]
+        expand=["downloads"],
     )
 
     download(base_model_id)
-    base_model = AutoModelForCausalLM.from_pretrained(f"models/{base_model_id}", device_map="cpu")
-    tokenizer = AutoTokenizer.from_pretrained(f"models/{base_model_id}", device_map="cpu")
+    base_model = AutoModelForCausalLM.from_pretrained(
+        f"models/{base_model_id}", device_map="cpu"
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        f"models/{base_model_id}", device_map="cpu"
+    )
     base_model_state_dict = base_model.state_dict()
     merged_state_dict = deepcopy(base_model_state_dict)
+    release(base_model)
+
     merger = create_merge_instance(cfg)
 
     for model in models:
         print("Processing model: ", model.id)
         download(model.id)
-        finetuned_model = AutoModelForCausalLM.from_pretrained(f"models/{model.id}", device_map="cpu")
+        finetuned_model = AutoModelForCausalLM.from_pretrained(
+            f"models/{model.id}", device_map="cpu"
+        )
         finetuned_model_state_dict = finetuned_model.state_dict()
-        merged_state_dict = merger.merge([merged_state_dict, finetuned_model_state_dict])
+        release(finetuned_model)
+
+        merged_state_dict = merger.merge(
+            [merged_state_dict, finetuned_model_state_dict]
+        )
+        release(finetuned_model_state_dict)
+
         merged_model = AutoModelForCausalLM.from_pretrained(
-            f"models/{base_model_id}",
-            state_dict=merged_state_dict,
-            device_map="cpu"
+            f"models/{base_model_id}", state_dict=merged_state_dict, device_map="cpu"
         )
         if cfg.evaluate:
             evaluate(merged_model, tokenizer)
 
+        release(merged_model)
+
     print(f"Created merge instance using {cfg.merge.method} method")
+
 
 def download(model_id):
     """Download a model from HuggingFace Hub."""
     print(f"Downloading {model_id}...")
-    snapshot_download(
-        repo_id=model_id,
-        local_dir=f"models/{model_id}",
-        max_workers=1
-    )
+    snapshot_download(repo_id=model_id, local_dir=f"models/{model_id}", max_workers=1)
+
     print(f"Downloaded {model_id}.")
+
+
+def release(obj):
+    """Release memory used by an object and clean up."""
+    del obj
+    gc.collect()
+    torch.cuda.empty_cache()
+
 
 def evaluate(model, tokenizer):
     """Evaluate a model on a simple prompt."""
