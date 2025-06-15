@@ -26,7 +26,7 @@ monitor_memory() {
         echo "=== Process Memory Usage ==="
         ps -o pid,ppid,cmd,%mem,%cpu --sort=-%mem | head -n 10
         echo "==========================="
-        sleep 30
+        sleep 1
     done
 }
 
