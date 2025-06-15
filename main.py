@@ -33,7 +33,6 @@ def main(cfg: DictConfig):
     )
     base_model_state_dict = base_model.state_dict()
     merged_state_dict = deepcopy(base_model_state_dict)
-    release(base_model)
 
     merger = create_merge_instance(cfg)
 
@@ -44,20 +43,17 @@ def main(cfg: DictConfig):
             f"models/{model.id}", device_map="cpu"
         )
         finetuned_model_state_dict = finetuned_model.state_dict()
-        release(finetuned_model)
 
         merged_state_dict = merger.merge(
             [merged_state_dict, finetuned_model_state_dict]
         )
-        release(finetuned_model_state_dict)
+        base_model.load_state_dict(merged_state_dict)
 
-        merged_model = AutoModelForCausalLM.from_pretrained(
-            f"models/{base_model_id}", state_dict=merged_state_dict, device_map="cpu"
-        )
         if cfg.evaluate:
-            evaluate(merged_model, tokenizer)
+            evaluate(finetuned_model, tokenizer)
 
-        release(merged_model)
+        gc.collect()
+        torch.cuda.empty_cache()
 
     print(f"Created merge instance using {cfg.merge.method} method")
 
