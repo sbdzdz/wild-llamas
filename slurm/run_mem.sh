@@ -19,5 +19,21 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 source $HOME/.bashrc
 source $HOME/wild-llamas/.venv/bin/activate
 
+monitor_memory() {
+    while true; do
+        echo "=== Memory Usage at $(date) ==="
+        free -h
+        echo "=== Process Memory Usage ==="
+        ps -o pid,ppid,cmd,%mem,%cpu --sort=-%mem | head -n 10
+        echo "==========================="
+        sleep 1
+    done
+}
+
+monitor_memory &
+MONITOR_PID=$!
+
 additional_params="$@"
 python main.py $additional_params
+
+kill $MONITOR_PID
