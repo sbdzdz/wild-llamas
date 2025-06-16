@@ -24,6 +24,7 @@ def main(cfg: DictConfig):
         expand=["downloads", "safetensors"],
     )
     models = [model for model in models if is_bf16(model)]
+    print(f"Found {len(models)} models to merge.")
 
     download(base_model_id)
     base_model = AutoModelForCausalLM.from_pretrained(
