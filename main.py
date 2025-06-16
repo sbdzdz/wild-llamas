@@ -21,8 +21,9 @@ def main(cfg: DictConfig):
         direction=-1,
         limit=cfg.model_limit,
         gated=False,
-        expand=["downloads"],
+        expand=["downloads", "safetensors"],
     )
+    models = [model for model in models if is_bf16(model)]
 
     download(base_model_id)
     base_model = AutoModelForCausalLM.from_pretrained(
@@ -37,7 +38,7 @@ def main(cfg: DictConfig):
     merger = create_merge_instance(cfg)
 
     for model in models:
-        print("Processing model: ", model.id)
+        print("Merging model: ", model.id)
         download(model.id)
         finetuned_model = AutoModelForCausalLM.from_pretrained(
             f"models/{model.id}", device_map="cpu"
@@ -57,12 +58,14 @@ def main(cfg: DictConfig):
 
     print(f"Created merge instance using {cfg.merge.method} method")
 
+def is_bf16(model):
+    """Check if a model is bf16."""
+    return set(model.safetensors.parameters.keys()) == {'BF16'}
 
 def download(model_id):
     """Download a model from HuggingFace Hub."""
     print(f"Downloading {model_id}...")
     snapshot_download(repo_id=model_id, local_dir=f"models/{model_id}", max_workers=1)
-
     print(f"Downloaded {model_id}.")
 
 
