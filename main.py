@@ -1,5 +1,4 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
-
 import hydra
 from omegaconf import DictConfig
 from huggingface_hub import HfApi, snapshot_download
@@ -8,6 +7,7 @@ from copy import deepcopy
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import gc
 import torch
+from pathlib import Path
 
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
@@ -58,6 +58,13 @@ def main(cfg: DictConfig):
         torch.cuda.empty_cache()
 
     print(f"Created merge instance using {cfg.merge.method} method")
+
+    # Save the merged model
+    merged_model_path = Path("models/merged_model")
+    merged_model_path.mkdir(parents=True, exist_ok=True)
+    base_model.save_pretrained(merged_model_path)
+    tokenizer.save_pretrained(merged_model_path)
+    print(f"Saved merged model to {merged_model_path}")
 
 def is_bf16(model):
     """Check if a model is bf16."""
