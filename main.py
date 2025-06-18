@@ -59,7 +59,6 @@ def main(cfg: DictConfig):
 
     print(f"Created merge instance using {cfg.merge.method} method")
 
-    # Save the merged model
     merged_model_path = Path("models/merged_model")
     merged_model_path.mkdir(parents=True, exist_ok=True)
     base_model.save_pretrained(merged_model_path)
