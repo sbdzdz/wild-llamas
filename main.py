@@ -1,4 +1,5 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
+
 import hydra
 from omegaconf import DictConfig
 from huggingface_hub import HfApi, snapshot_download
@@ -38,7 +39,7 @@ def main(cfg: DictConfig):
 
     merger = create_merge_instance(cfg)
 
-    for model in models:
+    for i, model in enumerate(models):
         print("Merging model: ", model.id)
         download(model.id)
         finetuned_model = AutoModelForCausalLM.from_pretrained(
@@ -54,20 +55,18 @@ def main(cfg: DictConfig):
         if cfg.evaluate:
             evaluate(finetuned_model, tokenizer)
 
+        save_merged_model(base_model, i)
+
         gc.collect()
         torch.cuda.empty_cache()
 
     print(f"Created merge instance using {cfg.merge.method} method")
 
-    merged_model_path = Path("models/merged_model")
-    merged_model_path.mkdir(parents=True, exist_ok=True)
-    base_model.save_pretrained(merged_model_path)
-    tokenizer.save_pretrained(merged_model_path)
-    print(f"Saved merged model to {merged_model_path}")
 
 def is_bf16(model):
     """Check if a model is bf16."""
-    return set(model.safetensors.parameters.keys()) == {'BF16'}
+    return set(model.safetensors.parameters.keys()) == {"BF16"}
+
 
 def download(model_id):
     """Download a model from HuggingFace Hub."""
@@ -89,6 +88,14 @@ def evaluate(model, tokenizer):
     inputs = tokenizer(prompt, return_tensors="pt")
     outputs = model.generate(inputs["input_ids"], max_new_tokens=100)
     print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+
+
+def save_merged_model(model, merge_index):
+    """Save the merged model with a numbered name."""
+    merged_model_path = Path(f"models/merged_model_{merge_index}")
+    merged_model_path.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(merged_model_path)
+    print(f"Saved merged model to {merged_model_path}")
 
 
 if __name__ == "__main__":
