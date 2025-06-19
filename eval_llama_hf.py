@@ -1,4 +1,4 @@
-from opencompass.models import TurboMindModelwithChatTemplate
+from opencompass.models import HuggingFacewithChatTemplate
 from mmengine.config import read_base
 
 with read_base():
@@ -18,19 +18,16 @@ datasets = [
     *cmmlu_datasets,
 ]
 
-
 models = [
     dict(
-        type=TurboMindModelwithChatTemplate,
-        abbr="llama-3_1-8b-instruct-turbomind",
-        path="meta-llama/Meta-Llama-3.1-8B-Instruct",
-        engine_config=dict(max_batch_size=16, tp=1),
-        gen_config=dict(top_k=1, temperature=1e-6, top_p=0.9, max_new_tokens=64),
-        max_seq_len=16384,
+        type=HuggingFacewithChatTemplate,
+        abbr="merged-llama-3_1-8b-instruct",
+        path="models/current_model",
         max_out_len=64,
-        batch_size=16,
+        batch_size=8,
         run_cfg=dict(num_gpus=1),
         stop_words=["<|end_of_text|>", "<|eot_id|>"],
+        meta_template=api_meta_template,
     )
 ]
 
