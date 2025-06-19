@@ -798,7 +798,7 @@ name = "fire"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "termcolor" },
+    { name = "termcolor", marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6b/b6/82c7e601d6d3c3278c40b7bd35e17e82aa227f050aa9f66cb7b7fce29471/fire-0.7.0.tar.gz", hash = "sha256:961550f07936eaf65ad1dc8360f2b2bf8408fad46abbfa4d2a3794f8d2a95cdf", size = 87189, upload-time = "2024-10-01T14:29:31.585Z" }
 
@@ -1642,30 +1642,28 @@ name = "lmdeploy"
 version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "fastapi" },
-    { name = "fire" },
-    { name = "fuzzywuzzy" },
-    { name = "mmengine-lite" },
-    { name = "numpy" },
-    { name = "nvidia-cublas-cu11" },
-    { name = "nvidia-cuda-runtime-cu11" },
-    { name = "nvidia-nccl-cu11" },
-    { name = "peft" },
-    { name = "pydantic" },
-    { name = "pynvml" },
-    { name = "safetensors" },
-    { name = "sentencepiece" },
-    { name = "shortuuid" },
-    { name = "tiktoken" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "uvicorn" },
+    { name = "fastapi", marker = "sys_platform != 'darwin'" },
+    { name = "fire", marker = "sys_platform != 'darwin'" },
+    { name = "fuzzywuzzy", marker = "sys_platform != 'darwin'" },
+    { name = "mmengine-lite", marker = "sys_platform != 'darwin'" },
+    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "nvidia-cublas-cu11", marker = "sys_platform != 'darwin'" },
+    { name = "nvidia-cuda-runtime-cu11", marker = "sys_platform != 'darwin'" },
+    { name = "nvidia-nccl-cu11", marker = "sys_platform != 'darwin'" },
+    { name = "peft", marker = "sys_platform != 'darwin'" },
+    { name = "pydantic", marker = "sys_platform != 'darwin'" },
+    { name = "pynvml", marker = "sys_platform != 'darwin'" },
+    { name = "safetensors", marker = "sys_platform != 'darwin'" },
+    { name = "sentencepiece", marker = "sys_platform != 'darwin'" },
+    { name = "shortuuid", marker = "sys_platform != 'darwin'" },
+    { name = "tiktoken", marker = "sys_platform != 'darwin'" },
+    { name = "torch", marker = "sys_platform != 'darwin'" },
+    { name = "transformers", marker = "sys_platform != 'darwin'" },
+    { name = "uvicorn", marker = "sys_platform != 'darwin'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/02/d7f3d6145387a3858e32653dbe5d27e546c5cf944a2c586771f7edc932a5/lmdeploy-0.2.2-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:f335634c8bebb1ac8589df0f1e43422d15040fe9eb8c2501c20e7ace903a7287", size = 94899114, upload-time = "2024-01-31T10:47:56.479Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/26/8a88c49ce2de9edc538053f93d41d86207b866d07ce2b8dd33676dc20ac3/lmdeploy-0.2.2-cp310-cp310-win_amd64.whl", hash = "sha256:b20b9e93ccd2f19350164d9c24658a2efe347585b430a32c6935042924e664c3", size = 64014101, upload-time = "2024-01-31T10:48:03.399Z" },
     { url = "https://files.pythonhosted.org/packages/71/f5/a6eb801fe3ffd4ed65545f8d1e9f2a5931d80d1e91cd26c125e0bb88c66b/lmdeploy-0.2.2-cp311-cp311-manylinux2014_x86_64.whl", hash = "sha256:b25bd98cddabb84493629b81f2e4cd375d2c3015fdb90d484761988872f0bfe2", size = 94920694, upload-time = "2024-01-31T10:48:10.228Z" },
-    { url = "https://files.pythonhosted.org/packages/d4/a8/717a3c4f0acfb4fc57d63632ac27296e3416ff85689c68cf6314937f6a1b/lmdeploy-0.2.2-cp311-cp311-win_amd64.whl", hash = "sha256:a6d5019b77a2a443633318e12e9ab7e575413ec102a9911b6040e6a80c87703a", size = 64014706, upload-time = "2024-01-31T10:48:17.137Z" },
 ]
 
 [[package]]
@@ -2285,7 +2283,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/46/be/c222e33e60d28ecd496a46fc4d78ccae0ee28e1fd7dc705b6288b4cad27e/nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux1_x86_64.whl", hash = "sha256:39fb40e8f486dd8a2ddb8fdeefe1d5b28f5b99df01c87ab3676f057a74a5a6f3", size = 417870452, upload-time = "2022-10-18T21:17:48.638Z" },
     { url = "https://files.pythonhosted.org/packages/96/df/c5ac9ac5096355c47c606e613ecc7aa50fbccf5e0145df857d11da6464b1/nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux2014_aarch64.whl", hash = "sha256:5ccae9e069a2c6be9af9cb5a0b0c6928c19c7915e390d15f598a1eead2a01a7a", size = 291428448, upload-time = "2024-08-16T23:59:46.358Z" },
     { url = "https://files.pythonhosted.org/packages/ea/2e/9d99c60771d275ecf6c914a612e9a577f740a615bc826bec132368e1d3ae/nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux2014_x86_64.whl", hash = "sha256:60252822adea5d0b10cd990a7dc7bedf7435f30ae40083c7a624a85a43225abc", size = 417870460, upload-time = "2024-08-17T00:00:26.889Z" },
-    { url = "https://files.pythonhosted.org/packages/0b/1d/7a78cd36fd5e3da4021b3ac2c2c8b2651dd72345b7c3ecc0d3e051884f50/nvidia_cublas_cu11-11.11.3.6-py3-none-win_amd64.whl", hash = "sha256:6ab12b1302bef8ac1ff4414edd1c059e57f4833abef9151683fb8f4de25900be", size = 427234740, upload-time = "2022-10-18T21:21:50.058Z" },
 ]
 
 [[package]]
@@ -2321,7 +2318,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/45/3e/84db02be49fe6d6df6e42f69fd64501c22d0f9ada9c9877f885612085d20/nvidia_cuda_runtime_cu11-11.8.89-py3-none-manylinux1_x86_64.whl", hash = "sha256:f587bd726eb2f7612cf77ce38a2c1e65cf23251ff49437f6161ce0d647f64f7c", size = 875585, upload-time = "2022-10-03T21:46:03.05Z" },
     { url = "https://files.pythonhosted.org/packages/da/16/86d6f3f25c1d69cfcaa01c9a9704b7e946387b7aa13cc2f385b50eb46da5/nvidia_cuda_runtime_cu11-11.8.89-py3-none-manylinux2014_aarch64.whl", hash = "sha256:e53bf160b6b660819cb6e4a9da2cc89e6aa2329858299780a2459780a2b8d012", size = 805995, upload-time = "2024-08-16T23:56:10.507Z" },
     { url = "https://files.pythonhosted.org/packages/a6/ec/a540f28b31de7bc1ed49eecc72035d4cb77db88ead1d42f7bfa5ae407ac6/nvidia_cuda_runtime_cu11-11.8.89-py3-none-manylinux2014_x86_64.whl", hash = "sha256:92d04069a987e1fbc9213f8376d265df0f7bb42617d44f5eda1f496acea7f2d1", size = 875592, upload-time = "2024-08-16T23:56:18.774Z" },
-    { url = "https://files.pythonhosted.org/packages/48/ae/09f335dfbca630ae213e53d2a9294540620453fe2b37e7489ff05817a525/nvidia_cuda_runtime_cu11-11.8.89-py3-none-win_amd64.whl", hash = "sha256:f60c9fdaed8065b38de8097867240efc5556a8a710007146daeb9082334a6e63", size = 1021163, upload-time = "2022-10-03T23:37:53.656Z" },
 ]
 
 [[package]]
@@ -2859,16 +2855,16 @@ name = "peft"
 version = "0.15.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "accelerate" },
-    { name = "huggingface-hub" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "psutil" },
-    { name = "pyyaml" },
-    { name = "safetensors" },
-    { name = "torch" },
-    { name = "tqdm" },
-    { name = "transformers" },
+    { name = "accelerate", marker = "sys_platform != 'darwin'" },
+    { name = "huggingface-hub", marker = "sys_platform != 'darwin'" },
+    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "packaging", marker = "sys_platform != 'darwin'" },
+    { name = "psutil", marker = "sys_platform != 'darwin'" },
+    { name = "pyyaml", marker = "sys_platform != 'darwin'" },
+    { name = "safetensors", marker = "sys_platform != 'darwin'" },
+    { name = "torch", marker = "sys_platform != 'darwin'" },
+    { name = "tqdm", marker = "sys_platform != 'darwin'" },
+    { name = "transformers", marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/33/65/faa18cd8ffbe0f742c3f2559770646cce2574b9cd28a2a05e8d36f64e968/peft-0.15.2.tar.gz", hash = "sha256:7059029f4d42a092ded1aa117dd366a46084aef638bdd593f6ab0195d5427fcd", size = 472952, upload-time = "2025-04-15T15:27:53.09Z" }
 wheels = [
@@ -3327,7 +3323,7 @@ name = "pynvml"
 version = "12.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-ml-py" },
+    { name = "nvidia-ml-py", marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/26/6f/6b5880ed0239e85b9a39aed103b65b2ef81425beef9f45e5c035bf008330/pynvml-12.0.0.tar.gz", hash = "sha256:299ce2451a6a17e6822d6faee750103e25b415f06f59abb8db65d30f794166f5", size = 33636, upload-time = "2024-12-02T15:04:36.631Z" }
 wheels = [
@@ -4945,15 +4941,11 @@ dependencies = [
     { name = "accelerate" },
     { name = "huggingface-hub" },
     { name = "hydra-core" },
+    { name = "lmdeploy", marker = "sys_platform == 'linux'" },
     { name = "opencompass", extra = ["vllm"] },
     { name = "ruff" },
     { name = "torch" },
     { name = "transformers" },
-]
-
-[package.optional-dependencies]
-lmdeploy = [
-    { name = "lmdeploy" },
 ]
 
 [package.metadata]
@@ -4961,7 +4953,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.7.0" },
     { name = "huggingface-hub", specifier = ">=0.32.4" },
     { name = "hydra-core", specifier = ">=1.3.2" },
-    { name = "lmdeploy", marker = "extra == 'lmdeploy'", specifier = ">=0.2.2" },
+    { name = "lmdeploy", marker = "sys_platform == 'linux'", specifier = ">=0.2.2" },
     { name = "opencompass", extras = ["vllm"], specifier = ">=0.4.2" },
     { name = "ruff", specifier = ">=0.11.13" },
     { name = "torch", specifier = ">=2.7.0" },
