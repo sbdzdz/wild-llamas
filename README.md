@@ -4,7 +4,7 @@ Merging finetuned language models in the wild.
 
 ## Installation (with uv)
 
-To install the dependencies for this project using uv:
+To install the dependencies for this project:
 
 1. [Install uv](https://docs.astral.sh/uv/getting-started/installation)
 2. Install dependencies:
