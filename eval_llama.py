@@ -2,8 +2,6 @@ from opencompass.models import HuggingFacewithChatTemplate
 from mmengine.config import read_base
 
 with read_base():
-    # from opencompass.configs.dataset_collections.chat_OC15 import datasets
-    # from opencompass.configs.summarizers.chat_OC15 import summarizer
     from opencompass.configs.datasets.mmlu.mmlu_gen_4d595a import mmlu_datasets
     from opencompass.configs.datasets.cmmlu.cmmlu_gen_c13365 import cmmlu_datasets
 
@@ -14,6 +12,11 @@ api_meta_template = dict(
     ],
     reserved_roles=[dict(role="SYSTEM", api_role="SYSTEM")],
 )
+
+datasets = [
+    *mmlu_datasets,
+    *cmmlu_datasets,
+]
 
 models = [
     dict(
