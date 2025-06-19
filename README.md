@@ -17,6 +17,15 @@ This will set up your virtual environment with all required packages.
 
 ## Usage
 
+To run the main script, make sure to activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+python main.py
+```
+
+You can also simply use uv:
+
 ```bash
 uv run python main.py
 ```
