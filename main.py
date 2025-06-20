@@ -33,7 +33,7 @@ def main(cfg: DictConfig):
 
     download(base_model_id, "current_model")
     download(base_model_id, "merged_model")
-    evaluate(cfg.dataset_num_runs, "outputs/step_0")
+    evaluate("outputs/step_0")
 
     base_model = AutoModelForCausalLM.from_pretrained(
         "models/current_model", device_map="cpu"
@@ -54,7 +54,7 @@ def main(cfg: DictConfig):
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        evaluate(cfg.dataset_num_runs, f"outputs/step_{i}")
+        evaluate(f"outputs/step_{i}")
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -77,7 +77,7 @@ def download(model_id, folder):
     print(f"Downloaded {model_id}.")
 
 
-def evaluate(dataset_num_runs, work_dir):
+def evaluate(work_dir):
     """Call OpenCompass to evaluate the model using eval_llama.py."""
     if platform.system() == "Darwin":
         eval_script = "eval_llama_hf.py"
