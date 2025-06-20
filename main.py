@@ -1,15 +1,18 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
 
-import hydra
-from omegaconf import DictConfig
-from huggingface_hub import HfApi, snapshot_download
-from merge import create_merge_instance
-from copy import deepcopy
-from transformers import AutoModelForCausalLM
 import gc
-import torch
-from pathlib import Path
+import platform
 import subprocess
+from copy import deepcopy
+from pathlib import Path
+
+import hydra
+import torch
+from huggingface_hub import HfApi, snapshot_download
+from omegaconf import DictConfig
+from transformers import AutoModelForCausalLM
+
+from merge import create_merge_instance
 
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
@@ -75,7 +78,12 @@ def download(model_id, folder):
 
 def evaluate():
     """Call OpenCompass to evaluate the model using eval_llama.py."""
-    result = subprocess.run(["opencompass", "eval_llama.py"], check=True)
+    if platform.system() == "Darwin":
+        eval_script = "eval_llama_hf.py"
+    else:
+        eval_script = "eval_llama.py"
+
+    result = subprocess.run(["opencompass", eval_script], check=True)
     return result
 
 
