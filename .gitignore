@@ -2,6 +2,7 @@ __pycache__/
 
 models/
 outputs/
+tmp/
 
 .vscode/
 .cache/
