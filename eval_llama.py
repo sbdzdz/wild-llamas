@@ -22,8 +22,8 @@ datasets = [
 models = [
     dict(
         type=TurboMindModelwithChatTemplate,
-        abbr="llama-3_1-8b-instruct-turbomind",
-        path="meta-llama/Meta-Llama-3.1-8B-Instruct",
+        abbr=abbr,
+        path=path,
         engine_config=dict(max_batch_size=16, tp=1),
         gen_config=dict(top_k=1, temperature=1e-6, top_p=0.9, max_new_tokens=64),
         max_seq_len=16384,
@@ -32,6 +32,10 @@ models = [
         run_cfg=dict(num_gpus=1),
         stop_words=["<|end_of_text|>", "<|eot_id|>"],
     )
+    for abbr, path in [
+        ("current_model", "models/current_model"),
+        ("merged_model", "models/merged_model"),
+    ]
 ]
 
 work_dir = "outputs/merged-llama3-instruct"
