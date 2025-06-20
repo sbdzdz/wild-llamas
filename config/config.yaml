@@ -1,7 +1,5 @@
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
 model_limit: 5
-evaluate: true
-dataset_num_runs: 1
 
 run:
   dir: "outputs/hydra"

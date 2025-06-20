@@ -88,8 +88,6 @@ def evaluate(dataset_num_runs, work_dir):
         [
             "opencompass",
             eval_script,
-            "--dataset-num-runs",
-            str(dataset_num_runs),
             "--work-dir",
             work_dir,
         ],
