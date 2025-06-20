@@ -4,3 +4,4 @@ models/
 outputs/
 
 .vscode/
+.cache/
