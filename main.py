@@ -41,6 +41,7 @@ def main(cfg: DictConfig):
     merged_state_dict = deepcopy(base_model.state_dict())
 
     merger = create_merge_instance(cfg)
+    merger.update(merged_state_dict)
 
     for i, model in enumerate(models, start=1):
         download(model.id, "current_model")
@@ -50,7 +51,7 @@ def main(cfg: DictConfig):
         current_model_state_dict = current_model.state_dict()
 
         print(f"Merging {model.id}...")
-        merged_state_dict = merger.merge([merged_state_dict, current_model_state_dict])
+        merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         evaluate(cfg.dataset_num_runs, f"outputs/step_{i}")

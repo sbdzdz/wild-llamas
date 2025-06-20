@@ -7,7 +7,7 @@ run:
   dir: "outputs/hydra"
 
 merge:
-  method: weight_averaging
+  method: weight_averaging_running
 
   task_arithmetic:
     scaling_factor: 1.0

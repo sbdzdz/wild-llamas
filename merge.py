@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 import torch
 from omegaconf import DictConfig
+from copy import deepcopy
+
 
 def create_merge_instance(cfg: DictConfig):
     """Creates and returns an instance of the merge class based on the provided configuration."""
     method_to_class = {
         "weight_averaging": WeightAveraging,
+        "weight_averaging_running": WeightAveragingRunning,
         "task_arithmetic": TaskArithmetic,
         "ties": TIES,
     }
@@ -109,6 +112,46 @@ class WeightAveraging(BaseMerge):
             key: sum(weight * state_dict[key] for state_dict in state_dicts)
             for key in state_dicts[0].keys()
         }
+
+
+class WeightAveragingRunning:
+    """Running weight averaging technique that maintains the average of all state dictionaries seen so far."""
+
+    def __init__(self):
+        """Initialize with an initial state dictionary."""
+        self.current_average = None
+        self.step_count = 0
+
+    def validate_state_dict(self, state_dict):
+        """Check if the state dictionary has the same keys as the current average."""
+        if self.current_average is not None:
+            keys = set(self.current_average.keys())
+            if set(state_dict.keys()) != keys:
+                raise ValueError("Cannot merge state dictionaries with unequal keys.")
+
+    def update(self, new_state_dict):
+        """Update the running average with a new state dictionary."""
+        if self.current_average is None:
+            self.current_average = deepcopy(new_state_dict)
+            self.step_count = 1
+            return self.current_average
+
+        self.validate_state_dict(new_state_dict)
+
+        new_state_dict = {k: v.cpu() for k, v in new_state_dict.items()}
+        self.current_average = {k: v.cpu() for k, v in self.current_average.items()}
+
+        for key in self.current_average.keys():
+            current_avg = self.current_average[key]
+            new_value = new_state_dict[key]
+
+            # incremental update
+            self.current_average[key] = current_avg + (new_value - current_avg) / (
+                self.step_count + 1
+            )
+
+        self.step_count += 1
+        return self.current_average
 
 
 class TaskArithmetic(BaseTaskVectorMerge):
