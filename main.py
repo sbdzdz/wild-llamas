@@ -67,7 +67,7 @@ def is_bf16(model):
 
 def download(model_id, folder):
     """Download a model from HuggingFace Hub to a fixed directory."""
-    print(f"Downloading {model_id} to models/current_model ...")
+    print(f"Downloading {model_id} to models/{folder}...")
     snapshot_download(
         repo_id=model_id,
         local_dir=f"models/{folder}",
