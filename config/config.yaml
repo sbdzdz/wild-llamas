@@ -1,5 +1,5 @@
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
-model_limit: 5
+model_limit: 20
 
 hydra:
   run:
