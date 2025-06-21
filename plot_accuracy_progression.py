@@ -2,7 +2,6 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 from pathlib import Path
 
 
@@ -36,10 +35,6 @@ def load_summary_data():
             "merged_model": merged_avg,
         }
 
-        print(
-            f"Step {step_num}: current_model={current_avg:.2f}, merged_model={merged_avg:.2f}"
-        )
-
     return step_data
 
 
@@ -63,7 +58,7 @@ def create_plot(step_data):
         steps, merged_accuracies, "s-", label="Merged Model", linewidth=2, markersize=6
     )
 
-    plt.xlabel("Step", fontsize=12)
+    plt.xlabel("Number of merged models", fontsize=12)
     plt.ylabel("Average Accuracy (%)", fontsize=12)
     plt.title(
         "Model Accuracy Progression Across Merging Steps",
@@ -97,22 +92,9 @@ def create_plot(step_data):
     plt.savefig("accuracy_progression.png", dpi=300, bbox_inches="tight")
     plt.show()
 
-    print("\nSummary Statistics:")
-    print(f"Steps processed: {len(steps)}")
-    print(
-        f"Current model accuracy range: {min(current_accuracies):.2f} - {max(current_accuracies):.2f}"
-    )
-    print(
-        f"Merged model accuracy range: {min(merged_accuracies):.2f} - {max(merged_accuracies):.2f}"
-    )
-    print(
-        f"Average improvement: {np.mean(merged_accuracies) - np.mean(current_accuracies):.2f}"
-    )
-
 
 def main():
     """Main function to load data and create plot."""
-    print("Loading summary data from outputs directory...")
     step_data = load_summary_data()
     print(f"\nFound data for {len(step_data)} steps")
     create_plot(step_data)
