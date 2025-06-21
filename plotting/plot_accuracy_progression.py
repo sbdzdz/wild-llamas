@@ -89,7 +89,9 @@ def create_plot(step_data):
         )
 
     plt.tight_layout()
-    plt.savefig("accuracy_progression.png", dpi=300, bbox_inches="tight")
+    figures_dir = Path("figures")
+    figures_dir.mkdir(exist_ok=True)
+    plt.savefig(figures_dir / "accuracy_progression.png", dpi=300, bbox_inches="tight")
     plt.show()
 
 
