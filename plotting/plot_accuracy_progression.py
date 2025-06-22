@@ -46,22 +46,28 @@ def create_plot(step_data):
 
     plt.figure(figsize=(10, 6))
 
-    plt.plot(
+    plt.scatter(
         steps,
         current_accuracies,
-        "o-",
         label="Current Model",
-        linewidth=2,
-        markersize=6,
+        s=50,
+        color="#1f77b4",
+        zorder=5,
     )
     plt.plot(
-        steps, merged_accuracies, "s-", label="Merged Model", linewidth=2, markersize=6
+        steps,
+        merged_accuracies,
+        "s-",
+        label="Merged Model",
+        linewidth=2,
+        markersize=6,
+        color="#ff7f0e",
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
-    plt.ylabel("Average Accuracy (%)", fontsize=12)
+    plt.ylabel("Average Accuracy (%) over MMLU and CMMLU", fontsize=12)
     plt.title(
-        "Model Accuracy Progression Across Merging Steps",
+        "LLaMA-3.1-8B-Instruct Accuracy Across Merging Steps",
         fontsize=14,
         fontweight="bold",
     )
@@ -75,17 +81,19 @@ def create_plot(step_data):
             f"{current:.1f}",
             (step, current),
             textcoords="offset points",
-            xytext=(0, 10),
+            xytext=(5, -15),
             ha="center",
             fontsize=8,
+            color="#1f77b4",
         )
         plt.annotate(
             f"{merged:.1f}",
             (step, merged),
             textcoords="offset points",
-            xytext=(0, -15),
+            xytext=(-5, 10),
             ha="center",
             fontsize=8,
+            color="#ff7f0e",
         )
 
     plt.tight_layout()
