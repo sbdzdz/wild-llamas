@@ -23,7 +23,7 @@ models = [
         type=HuggingFacewithChatTemplate,
         abbr=abbr,
         path=path,
-        max_out_len=64,
+        max_out_len=32,
         batch_size=8,
         run_cfg=dict(num_gpus=1),
         stop_words=["<|end_of_text|>", "<|eot_id|>"],
