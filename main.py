@@ -45,10 +45,10 @@ def main(cfg: DictConfig):
 
     for i, model in enumerate(models, start=1):
         download(model.id, "current_model")
-        current_model = AutoModelForCausalLM.from_pretrained(
-            "models/current_model", device_map="cpu", trust_remote_code=True
-        )
-        current_model_state_dict = current_model.state_dict()
+        current_model_state_dict = load(model.id, "current_model")
+
+        if current_model_state_dict is None:
+            continue
 
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
@@ -94,6 +94,18 @@ def evaluate(work_dir):
         check=True,
     )
     return result
+
+
+def load(model_id, folder):
+    """Load a model from the specified folder. Returns None if loading fails."""
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            f"models/{folder}", device_map="cpu", trust_remote_code=True
+        )
+        return model.state_dict()
+    except ImportError:
+        print(f"Model {model_id} requires additional dependencies. Skipping.")
+        return None
 
 
 def save(model, folder):
