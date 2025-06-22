@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
     evaluate("outputs/step_0")
 
     base_model = AutoModelForCausalLM.from_pretrained(
-        "models/current_model", device_map="cpu"
+        "models/current_model", device_map="cpu", trust_remote_code=True
     )
     merged_state_dict = deepcopy(base_model.state_dict())
 
@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
     for i, model in enumerate(models, start=1):
         download(model.id, "current_model")
         current_model = AutoModelForCausalLM.from_pretrained(
-            "models/current_model", device_map="cpu"
+            "models/current_model", device_map="cpu", trust_remote_code=True
         )
         current_model_state_dict = current_model.state_dict()
 
