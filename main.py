@@ -33,7 +33,8 @@ def main(cfg: DictConfig):
 
     download(base_model_id, "current_model")
     download(base_model_id, "merged_model")
-    evaluate("outputs/step_0")
+    evaluate_current("outputs/step_0")
+    evaluate_merged("outputs/step_0")
 
     base_model = AutoModelForCausalLM.from_pretrained(
         "models/current_model", device_map="cpu", trust_remote_code=True
@@ -54,7 +55,8 @@ def main(cfg: DictConfig):
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        evaluate(f"outputs/step_{i}")
+        evaluate_current(f"outputs/step_{i}")
+        evaluate_merged(f"outputs/step_{i}")
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -77,13 +79,28 @@ def download(model_id, folder):
     print(f"Downloaded {model_id}.")
 
 
-def evaluate(work_dir):
-    """Call OpenCompass to evaluate the model using eval_llama.py."""
+def evaluate_current(work_dir):
     if platform.system() == "Darwin":
-        eval_script = "eval_llama_hf.py"
+        eval_script = "eval_current_hf.py"
     else:
-        eval_script = "eval_llama.py"
+        eval_script = "eval_current.py"
+    result = subprocess.run(
+        [
+            "opencompass",
+            eval_script,
+            "--work-dir",
+            work_dir,
+        ],
+        check=True,
+    )
+    return result
 
+
+def evaluate_merged(work_dir):
+    if platform.system() == "Darwin":
+        eval_script = "eval_merged_hf.py"
+    else:
+        eval_script = "eval_merged.py"
     result = subprocess.run(
         [
             "opencompass",

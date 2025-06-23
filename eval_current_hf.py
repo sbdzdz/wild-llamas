@@ -21,18 +21,14 @@ datasets = [
 models = [
     dict(
         type=HuggingFacewithChatTemplate,
-        abbr=abbr,
-        path=path,
+        abbr="current_model",
+        path="models/current_model",
         max_out_len=32,
         batch_size=8,
         run_cfg=dict(num_gpus=1),
         stop_words=["<|end_of_text|>", "<|eot_id|>"],
         meta_template=api_meta_template,
     )
-    for abbr, path in [
-        ("current_model", "models/current_model"),
-        ("merged_model", "models/merged_model"),
-    ]
 ]
 
 work_dir = "outputs/merged-llama3-instruct"
