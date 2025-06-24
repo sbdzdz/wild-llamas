@@ -11,6 +11,7 @@ import torch
 from huggingface_hub import HfApi, snapshot_download
 from omegaconf import DictConfig
 from transformers import AutoModelForCausalLM
+import pandas as pd
 
 from merge import create_merge_instance
 
@@ -33,8 +34,7 @@ def main(cfg: DictConfig):
 
     download(base_model_id, "current_model")
     download(base_model_id, "merged_model")
-    evaluate_current("outputs/step_0")
-    evaluate_merged("outputs/step_0")
+    evaluate_merged("outputs/step_0/merged")
 
     base_model = AutoModelForCausalLM.from_pretrained(
         "models/current_model", device_map="cpu", trust_remote_code=True
@@ -46,17 +46,22 @@ def main(cfg: DictConfig):
 
     for i, model in enumerate(models, start=1):
         download(model.id, "current_model")
-        current_model_state_dict = load(model.id, "current_model")
 
+        current_model_state_dict = load(model.id, "current_model")
         if current_model_state_dict is None:
+            continue
+
+        evaluate_current(f"outputs/step_{i}/current")
+
+        current_avg = get_accuracy(f"outputs/step_{i}/current")
+        if current_avg < 50.0:
             continue
 
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        evaluate_current(f"outputs/step_{i}")
-        evaluate_merged(f"outputs/step_{i}")
+        evaluate_merged(f"outputs/step_{i}/merged")
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -131,6 +136,19 @@ def save(model, folder):
     merged_model_path.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(merged_model_path)
     print(f"Saved merged model to {merged_model_path}")
+
+
+def get_accuracy(work_dir):
+    """Get the average accuracy from evaluation results."""
+    step_dir = Path(work_dir)
+    timestamp_dir = next(d for d in step_dir.iterdir() if d.is_dir())
+    summary_dir = timestamp_dir / "summary"
+    csv_file = next(summary_dir.glob("*.csv"))
+    df = pd.read_csv(csv_file)
+    df["current_model"] = pd.to_numeric(
+        df["current_model"].replace("-", 0), errors="coerce"
+    )
+    return df["current_model"].mean()
 
 
 if __name__ == "__main__":
