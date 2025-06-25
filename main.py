@@ -43,29 +43,39 @@ def main(cfg: DictConfig):
     base_model = AutoModelForCausalLM.from_pretrained(
         "models/current_model", device_map="cpu", trust_remote_code=True
     )
+    base_state_dict = deepcopy(base_model.state_dict())
     merged_state_dict = deepcopy(base_model.state_dict())
 
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
 
-    for i, model in enumerate(models, start=1):
+    merging_step = 1
+    for model in models:
         download(model.id, "current_model")
 
         current_model_state_dict = load(model.id, "current_model")
         if current_model_state_dict is None:
             continue
 
-        evaluate_current(f"outputs/step_{i}/current")
+        if are_nearly_equal(base_state_dict, current_model_state_dict):
+            print(f"Model {model.id} is nearly equal to the base model. Skipping.")
+            continue
+        else:
+            print(f"Model {model.id} is not nearly equal to the base model. Merging.")
 
-        current_avg = get_accuracy(f"outputs/step_{i}/current")
+        evaluate_current(f"outputs/step_{merging_step}/current")
+
+        current_avg = get_accuracy(f"outputs/step_{merging_step}/current")
         if current_avg < 50.0:
+            print(f"Model {model.id} has poor performance: {current_avg:.1f}. Skipping.")
             continue
 
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        evaluate_merged(f"outputs/step_{i}/merged")
+        evaluate_merged(f"outputs/step_{merging_step}/merged")
+        merging_step += 1  # Increment merging step only after successful merge
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -80,6 +90,15 @@ def is_text_generation(model):
     """Check if a model is text generation model."""
     return model.pipeline_tag == 'text-generation'
 
+
+def are_nearly_equal(sd1, sd2):
+    """Check if two state dictionaries are nearly equal."""
+    for key in sd1.keys():
+        if sd1[key].shape != sd2[key].shape:
+            return False
+        if not torch.allclose(sd1[key], sd2[key]):
+            return False
+    return True
 
 
 def download(model_id, folder):
