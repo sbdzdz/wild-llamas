@@ -27,10 +27,13 @@ def main(cfg: DictConfig):
         direction=-1,
         limit=cfg.model_limit,
         gated=False,
-        expand=["downloads", "safetensors"],
+        expand=["downloads", "safetensors", "pipeline_tag"],
     )
     models = [model for model in models if is_bf16(model)]
-    print(f"Found {len(models)} models to merge.")
+    print(f"Found {len(models)} BF16 models to merge.")
+    
+    models = [model for model in models if is_text_generation(model)]
+    print(f"Found {len(models)} text generation models to merge.")
 
     download(base_model_id, "current_model")
     download(base_model_id, "merged_model")
@@ -70,6 +73,12 @@ def main(cfg: DictConfig):
 def is_bf16(model):
     """Check if a model is bf16."""
     return set(model.safetensors.parameters.keys()) == {"BF16"}
+
+
+def is_text_generation(model):
+    """Check if a model is text generation model."""
+    return model.pipeline_tag == 'text-generation'
+
 
 
 def download(model_id, folder):
