@@ -3,6 +3,7 @@
 import gc
 import platform
 import subprocess
+import shutil
 from copy import deepcopy
 from pathlib import Path
 
@@ -36,8 +37,8 @@ def main(cfg: DictConfig):
     print(f"Found {len(models)} text generation models to merge.")
 
     download(base_model_id, "current_model")
-    download(base_model_id, "merged_model")
-    evaluate_merged("outputs/step_0/merged")
+    shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
+    evaluate_current("outputs/step_0/current")
 
     base_model = AutoModelForCausalLM.from_pretrained(
         "models/current_model", device_map="cpu", trust_remote_code=True
