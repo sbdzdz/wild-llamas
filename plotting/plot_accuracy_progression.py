@@ -43,6 +43,9 @@ def load_summary_data():
         if step_num == 0:
             merged_avg_acc = current_avg_acc
 
+        current_avg_acc = current_avg_acc or 0.0
+        merged_avg_acc = merged_avg_acc or 0.0
+
         step_data[step_num] = {
             "current_model": current_avg_acc,
             "merged_model": merged_avg_acc,
