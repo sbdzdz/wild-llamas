@@ -1103,6 +1103,19 @@ wheels = [
 ]
 
 [[package]]
+name = "latex2sympy2-extended"
+version = "1.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "antlr4-python3-runtime" },
+    { name = "sympy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/14/8d/de5cc53dcf8a98396094b81a6478eb7234ef2e5c5fa4900dcc335d3b7fc2/latex2sympy2_extended-1.10.1.tar.gz", hash = "sha256:e365f0cb8807296c9d1f1661be926859bebd922a6139ce4be1e6572ca183ca57", size = 205808, upload-time = "2025-02-27T16:02:48.124Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/eb/a5e8b06b924b4149cf498e1598116bad1e91ab23046c2dfc2c498154d393/latex2sympy2_extended-1.10.1-py3-none-any.whl", hash = "sha256:917a23e8f3b6edea88a56978fbbe87ed9fca4197f8277646be57b4660710347c", size = 207460, upload-time = "2025-02-27T16:02:45.941Z" },
+]
+
+[[package]]
 name = "levenshtein"
 version = "0.27.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1364,6 +1377,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/80/0985960e4b89922cb5a0bac0ed39c5b96cbc1a536a99f30e8c220a996ed9/MarkupSafe-3.0.2-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:131a3c7689c85f5ad20f9f6fb1b866f402c445b220c19fe4308c0b147ccd2ad9", size = 24098, upload-time = "2024-10-18T15:21:40.813Z" },
     { url = "https://files.pythonhosted.org/packages/82/78/fedb03c7d5380df2427038ec8d973587e90561b2d90cd472ce9254cf348b/MarkupSafe-3.0.2-cp313-cp313t-win32.whl", hash = "sha256:ba8062ed2cf21c07a9e295d5b8a2a5ce678b913b45fdf68c32d95d6c1291e0b6", size = 15208, upload-time = "2024-10-18T15:21:41.814Z" },
     { url = "https://files.pythonhosted.org/packages/4f/65/6079a46068dfceaeabb5dcad6d674f5f5c61a6fa5673746f42a9f4c233b3/MarkupSafe-3.0.2-cp313-cp313t-win_amd64.whl", hash = "sha256:e444a31f8db13eb18ada366ab3cf45fd4b31e4db1236a4448f68778c1d1a5a2f", size = 15739, upload-time = "2024-10-18T15:21:42.784Z" },
+]
+
+[[package]]
+name = "math-verify"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "latex2sympy2-extended" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ab/59/7daf53e52593af0f7f455ea97c91dc34682f1c2e72f493490259a640836c/math_verify-0.7.0.tar.gz", hash = "sha256:b7459c7b9f1c503b7df32566a95f1e6a33a6cad8cbb759eaa6f100d401112024", size = 57582, upload-time = "2025-02-27T16:21:04.151Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/c5/e5de2e29f9db4c92956ce167e1aa534b1e1770ddc0b17600257cf5f8bd50/math_verify-0.7.0-py3-none-any.whl", hash = "sha256:bbdd491b511f6ceef27c5e08543affa1735807b6e3abb6f005bf493dc0eb485b", size = 28677, upload-time = "2025-02-27T16:20:56.612Z" },
 ]
 
 [[package]]
@@ -3493,10 +3518,13 @@ dependencies = [
     { name = "accelerate" },
     { name = "huggingface-hub" },
     { name = "hydra-core" },
+    { name = "latex2sympy2-extended" },
     { name = "lmdeploy", marker = "sys_platform == 'linux'" },
+    { name = "math-verify" },
     { name = "opencompass" },
     { name = "pytorchvideo" },
     { name = "ruff" },
+    { name = "setuptools" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "transformers" },
@@ -3507,10 +3535,13 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.7.0" },
     { name = "huggingface-hub", specifier = ">=0.32.4" },
     { name = "hydra-core", specifier = ">=1.3.2" },
+    { name = "latex2sympy2-extended", specifier = ">=1.10.1" },
     { name = "lmdeploy", marker = "sys_platform == 'linux'", specifier = ">=0.2.2" },
+    { name = "math-verify", specifier = ">=0.7.0" },
     { name = "opencompass", specifier = ">=0.4.2" },
     { name = "pytorchvideo", specifier = ">=0.1.5" },
     { name = "ruff", specifier = ">=0.11.13" },
+    { name = "setuptools", specifier = ">=80.9.0" },
     { name = "torch", specifier = "==2.6.0" },
     { name = "torchvision", specifier = ">=0.21.0" },
     { name = "transformers", specifier = ">=4.52.4" },
