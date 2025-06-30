@@ -11,7 +11,7 @@ import hydra
 import torch
 from huggingface_hub import snapshot_download
 from omegaconf import DictConfig
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import pandas as pd
 
 from merge import create_merge_instance
@@ -22,45 +22,43 @@ def main(cfg: DictConfig):
     base_model_id = cfg.base_model
     models = cfg.models
 
-    download(base_model_id, "current_model")
-    shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
+    current_model, current_tokenizer = load_model_and_tokenizer(base_model_id)
+    save_model_and_tokenizer(current_model, current_tokenizer, "current_model")
+    save_model_and_tokenizer(current_model, current_tokenizer, "merged_model")
     evaluate_current("outputs-reasoning/step_0/current")
+    
+    # base_state_dict = deepcopy(base_model.state_dict())
+    # merged_state_dict = deepcopy(base_model.state_dict())
 
-    base_model = AutoModelForCausalLM.from_pretrained(
-        "models/current_model", device_map="cpu", trust_remote_code=True
-    )
-    base_state_dict = deepcopy(base_model.state_dict())
-    merged_state_dict = deepcopy(base_model.state_dict())
-
-    merger = create_merge_instance(cfg)
-    merger.update(merged_state_dict)
+    # merger = create_merge_instance(cfg)
+    # merger.update(merged_state_dict)
 
     merging_step = 1
     for model in models:
-        download(model, "current_model")
+        current_model, current_tokenizer = load_model_and_tokenizer(model)
+        save_model_and_tokenizer(current_model, current_tokenizer, "current_model")
+        
+        # current_model_state_dict = load(model, "current_model")
+        # if current_model_state_dict is None:
+        #     continue
 
-        current_model_state_dict = load(model, "current_model")
-        if current_model_state_dict is None:
-            continue
-
-        if are_nearly_equal(base_state_dict, current_model_state_dict):
-            print(f"Model {model} is nearly equal to the base model. Skipping.")
-            continue
-        else:
-            print(f"Model {model} is not nearly equal to the base model. Merging.")
+        # if are_nearly_equal(base_state_dict, current_model_state_dict):
+        #     print(f"Model {model} is nearly equal to the base model. Skipping.")
+        #     continue
+        # else:
+        #     print(f"Model {model} is not nearly equal to the base model. Merging.")
 
         evaluate_current(f"outputs-reasoning/step_{merging_step}/current")
 
-        current_avg = get_accuracy(f"outputs-reasoning/step_{merging_step}/current")
-        if current_avg < 50.0:
-            print(f"Model {model} has poor performance: {current_avg:.1f}. Skipping.")
-            continue
+        # current_avg = get_accuracy(f"outputs-reasoning/step_{merging_step}/current")
+        # if current_avg < 50.0:
+        #     print(f"Model {model} has poor performance: {current_avg:.1f}. Skipping.")
+        #     continue
 
-        print(f"Merging {model}...")
-        merged_state_dict = merger.update(current_model_state_dict)
-        base_model.load_state_dict(merged_state_dict)
-        save(base_model, "merged_model")
-        evaluate_merged(f"outputs-reasoning/step_{merging_step}/merged")
+        # print(f"Merging {model}...")
+        # merged_state_dict = merger.update(current_model_state_dict)
+        # base_model.load_state_dict(merged_state_dict)
+        # evaluate_merged(f"outputs-reasoning/step_{merging_step}/merged")
         merging_step += 1  # Increment merging step only after successful merge
 
         gc.collect()
@@ -85,18 +83,6 @@ def are_nearly_equal(sd1, sd2):
         if not torch.allclose(sd1[key], sd2[key]):
             return False
     return True
-
-
-def download(model_id, folder):
-    """Download a model from HuggingFace Hub to a fixed directory."""
-    print(f"Downloading {model_id} to models/{folder}...")
-    snapshot_download(
-        repo_id=model_id,
-        local_dir=f"models/{folder}",
-        max_workers=1,
-        local_dir_use_symlinks=False,
-    )
-    print(f"Downloaded {model_id}.")
 
 
 def evaluate_current(work_dir):
@@ -145,12 +131,26 @@ def load(model_id, folder):
         return None
 
 
-def save(model, folder):
-    """Save the merged model with a numbered name."""
-    merged_model_path = Path(f"models/{folder}")
-    merged_model_path.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(merged_model_path)
-    print(f"Saved merged model to {merged_model_path}")
+def load_model_and_tokenizer(model_id):
+    """Load both model and tokenizer from HuggingFace Hub."""
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id, device_map="cpu", trust_remote_code=True
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id, trust_remote_code=True
+    )
+    return model, tokenizer
+
+
+def save_model_and_tokenizer(model, tokenizer, folder):
+    """Save both model and tokenizer together."""
+    model_path = Path(f"models/{folder}")
+    if model_path.exists():  # remove so the files do not mix in unexpected way
+        shutil.rmtree(model_path)
+    model_path.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(model_path)
+    tokenizer.save_pretrained(model_path)
+    print(f"Saved model and tokenizer to {model_path}")
 
 
 def get_accuracy(work_dir):
