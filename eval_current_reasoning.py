@@ -3,6 +3,7 @@ from mmengine.config import read_base
 
 with read_base():
     from opencompass.configs.datasets.math.math_500_gen import math_datasets
+    from opencompass.configs.datasets.aime2024.aime2024_gen_17d799 import aime2024_datasets
 
 api_meta_template = dict(
     round=[
@@ -14,6 +15,7 @@ api_meta_template = dict(
 
 datasets = [
     *math_datasets,
+    *aime2024_datasets,
 ]
 
 models = [
