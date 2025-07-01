@@ -27,38 +27,39 @@ def main(cfg: DictConfig):
     save_model_and_tokenizer(current_model, current_tokenizer, "merged_model")
     evaluate_current("outputs-reasoning/step_0/current")
     
-    # base_state_dict = deepcopy(base_model.state_dict())
-    # merged_state_dict = deepcopy(base_model.state_dict())
+    base_state_dict = deepcopy(current_model.state_dict())
+    merged_state_dict = deepcopy(current_model.state_dict())
 
-    # merger = create_merge_instance(cfg)
-    # merger.update(merged_state_dict)
+    merger = create_merge_instance(cfg)
+    merger.update(merged_state_dict)
 
     merging_step = 1
     for model in models:
         current_model, current_tokenizer = load_model_and_tokenizer(model)
         save_model_and_tokenizer(current_model, current_tokenizer, "current_model")
         
-        # current_model_state_dict = load(model, "current_model")
-        # if current_model_state_dict is None:
-        #     continue
+        current_model_state_dict = load(model, "current_model")
+        if current_model_state_dict is None:
+            continue
 
-        # if are_nearly_equal(base_state_dict, current_model_state_dict):
-        #     print(f"Model {model} is nearly equal to the base model. Skipping.")
-        #     continue
-        # else:
-        #     print(f"Model {model} is not nearly equal to the base model. Merging.")
+        if are_nearly_equal(base_state_dict, current_model_state_dict):
+            print(f"Model {model} is nearly equal to the base model. Skipping.")
+            continue
+        else:
+            print(f"Model {model} is not nearly equal to the base model. Merging.")
 
         evaluate_current(f"outputs-reasoning/step_{merging_step}/current")
 
-        # current_avg = get_accuracy(f"outputs-reasoning/step_{merging_step}/current")
-        # if current_avg < 50.0:
-        #     print(f"Model {model} has poor performance: {current_avg:.1f}. Skipping.")
-        #     continue
+        current_avg = get_accuracy(f"outputs-reasoning/step_{merging_step}/current")
+        if current_avg < 1.0:
+            print(f"Model {model} has poor performance: {current_avg:.1f}. Skipping.")
+            continue
 
-        # print(f"Merging {model}...")
-        # merged_state_dict = merger.update(current_model_state_dict)
-        # base_model.load_state_dict(merged_state_dict)
-        # evaluate_merged(f"outputs-reasoning/step_{merging_step}/merged")
+        print(f"Merging {model}...")
+        merged_state_dict = merger.update(current_model_state_dict)
+        current_model.load_state_dict(merged_state_dict)
+        save_model_and_tokenizer(current_model, current_tokenizer, "merged_model")
+        evaluate_merged(f"outputs-reasoning/step_{merging_step}/merged")
         merging_step += 1  # Increment merging step only after successful merge
 
         gc.collect()
