@@ -15,7 +15,7 @@ api_meta_template = dict(
 
 datasets = [
     *math_datasets,
-    *aime2024_datasets,
+    # *aime2024_datasets,
 ]
 
 models = [
@@ -24,12 +24,12 @@ models = [
         abbr="merged_model",
         path="models/merged_model",
         engine_config=dict(max_batch_size=16, tp=1),
-        gen_config=dict(top_k=1, temperature=0.8, top_p=0.9, max_new_tokens=32768),
+        gen_config=dict(do_sample=True, top_k=0, temperature=0.6, top_p=0.9, max_new_tokens=32768),
         max_seq_len=49152,  # 16384 + 32768
         max_out_len=32768,
         batch_size=16,
         run_cfg=dict(num_gpus=1),
-        stop_words=["<|end_of_text|>", "<|eot_id|>"],
+        stop_words=["<|end_of_text|>", "<|eom_id|>", "<|eot_id|>"],
     )
 ]
 
