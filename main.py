@@ -1,7 +1,6 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
 
 import gc
-import platform
 import subprocess
 import shutil
 from copy import deepcopy
@@ -32,9 +31,6 @@ def main(cfg: DictConfig):
     )
     models = [model for model in models if is_bf16(model)]
     print(f"Found {len(models)} BF16 models to merge.")
-    
-    models = [model for model in models if is_text_generation(model)]
-    print(f"Found {len(models)} text generation models to merge.")
 
     download(base_model_id, "current_model")
     shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
@@ -54,20 +50,19 @@ def main(cfg: DictConfig):
         download(model.id, "current_model")
 
         current_model_state_dict = load(model.id, "current_model")
-        if current_model_state_dict is None:
+        if current_model_state_dict is None or not is_text_generation(model):
+            print(f"Model {model.id} is not a text generation model. Skipping.")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
             print(f"Model {model.id} is nearly equal to the base model. Skipping.")
             continue
-        else:
-            print(f"Model {model.id} is not nearly equal to the base model. Merging.")
 
         evaluate_current(f"outputs/step_{merging_step}/current")
 
-        current_avg = get_accuracy(f"outputs/step_{merging_step}/current")
-        if current_avg < 50.0:
-            print(f"Model {model.id} has poor performance: {current_avg:.1f}. Skipping.")
+        accuracy = get_accuracy(f"outputs/step_{merging_step}/current")
+        if accuracy < 50.0:
+            print(f"Model {model.id} has poor performance: {accuracy:.1f}. Skipping.")
             continue
 
         print(f"Merging {model.id}...")
@@ -75,7 +70,7 @@ def main(cfg: DictConfig):
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         evaluate_merged(f"outputs/step_{merging_step}/merged")
-        merging_step += 1  # Increment merging step only after successful merge
+        merging_step += 1
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -88,7 +83,7 @@ def is_bf16(model):
 
 def is_text_generation(model):
     """Check if a model is text generation model."""
-    return model.pipeline_tag == 'text-generation'
+    return model.pipeline_tag is None or model.pipeline_tag == "text-generation"
 
 
 def are_nearly_equal(sd1, sd2):
@@ -114,14 +109,10 @@ def download(model_id, folder):
 
 
 def evaluate_current(work_dir):
-    if platform.system() == "Darwin":
-        eval_script = "eval_current_hf.py"
-    else:
-        eval_script = "eval_current.py"
     result = subprocess.run(
         [
             "opencompass",
-            eval_script,
+            "eval_current.py",
             "--work-dir",
             work_dir,
         ],
@@ -131,14 +122,10 @@ def evaluate_current(work_dir):
 
 
 def evaluate_merged(work_dir):
-    if platform.system() == "Darwin":
-        eval_script = "eval_merged_hf.py"
-    else:
-        eval_script = "eval_merged.py"
     result = subprocess.run(
         [
             "opencompass",
-            eval_script,
+            "eval_merged.py",
             "--work-dir",
             work_dir,
         ],
