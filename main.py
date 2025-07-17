@@ -66,7 +66,9 @@ def main(cfg: DictConfig):
 
         current_avg = get_accuracy(f"outputs/step_{merging_step}/current")
         if current_avg < 50.0:
-            print(f"Model {model.id} has poor performance: {current_avg:.1f}. Skipping.")
+            print(
+                f"Model {model.id} has poor performance: {current_avg:.1f}. Skipping."
+            )
             continue
 
         print(f"Merging {model.id}...")
@@ -87,7 +89,7 @@ def is_bf16(model):
 
 def is_text_generation(model):
     """Check if a model is text generation model."""
-    return model.pipeline_tag == 'text-generation'
+    return model.pipeline_tag == "text-generation"
 
 
 def are_nearly_equal(sd1, sd2):
