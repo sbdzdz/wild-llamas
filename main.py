@@ -1,7 +1,6 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
 
 import gc
-import platform
 import subprocess
 import shutil
 from copy import deepcopy
@@ -32,7 +31,7 @@ def main(cfg: DictConfig):
     )
     models = [model for model in models if is_bf16(model)]
     print(f"Found {len(models)} BF16 models to merge.")
-    
+
     models = [model for model in models if is_text_generation(model)]
     print(f"Found {len(models)} text generation models to merge.")
 
@@ -75,7 +74,7 @@ def main(cfg: DictConfig):
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         evaluate_merged(f"outputs/step_{merging_step}/merged")
-        merging_step += 1  # Increment merging step only after successful merge
+        merging_step += 1
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -114,14 +113,10 @@ def download(model_id, folder):
 
 
 def evaluate_current(work_dir):
-    if platform.system() == "Darwin":
-        eval_script = "eval_current_hf.py"
-    else:
-        eval_script = "eval_current.py"
     result = subprocess.run(
         [
             "opencompass",
-            eval_script,
+            "eval_current.py",
             "--work-dir",
             work_dir,
         ],
@@ -131,14 +126,10 @@ def evaluate_current(work_dir):
 
 
 def evaluate_merged(work_dir):
-    if platform.system() == "Darwin":
-        eval_script = "eval_merged_hf.py"
-    else:
-        eval_script = "eval_merged.py"
     result = subprocess.run(
         [
             "opencompass",
-            eval_script,
+            "eval_merged.py",
             "--work-dir",
             work_dir,
         ],
