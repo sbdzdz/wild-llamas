@@ -32,9 +32,6 @@ def main(cfg: DictConfig):
     models = [model for model in models if is_bf16(model)]
     print(f"Found {len(models)} BF16 models to merge.")
 
-    models = [model for model in models if is_text_generation(model)]
-    print(f"Found {len(models)} text generation models to merge.")
-
     download(base_model_id, "current_model")
     shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
     evaluate_current("outputs/step_0/current")
@@ -53,22 +50,19 @@ def main(cfg: DictConfig):
         download(model.id, "current_model")
 
         current_model_state_dict = load(model.id, "current_model")
-        if current_model_state_dict is None:
+        if current_model_state_dict is None or not is_text_generation(model):
+            print(f"Model {model.id} is not a text generation model. Skipping.")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
             print(f"Model {model.id} is nearly equal to the base model. Skipping.")
             continue
-        else:
-            print(f"Model {model.id} is not nearly equal to the base model. Merging.")
 
         evaluate_current(f"outputs/step_{merging_step}/current")
 
-        current_avg = get_accuracy(f"outputs/step_{merging_step}/current")
-        if current_avg < 50.0:
-            print(
-                f"Model {model.id} has poor performance: {current_avg:.1f}. Skipping."
-            )
+        accuracy = get_accuracy(f"outputs/step_{merging_step}/current")
+        if accuracy < 50.0:
+            print(f"Model {model.id} has poor performance: {accuracy:.1f}. Skipping.")
             continue
 
         print(f"Merging {model.id}...")
@@ -89,7 +83,7 @@ def is_bf16(model):
 
 def is_text_generation(model):
     """Check if a model is text generation model."""
-    return model.pipeline_tag == "text-generation"
+    return model.pipeline_tag is None or model.pipeline_tag == "text-generation"
 
 
 def are_nearly_equal(sd1, sd2):
