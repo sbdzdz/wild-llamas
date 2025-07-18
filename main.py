@@ -51,16 +51,20 @@ def main(cfg: DictConfig):
         if current_model_state_dict is None:
             continue
 
+        if not dtypes_match(base_state_dict, current_model_state_dict):
+            log_merge(model.id, False, "dtypes_mismatch")
+            continue
+
+        if not is_bf16(model):
+            log_merge(model.id, False, "not_bf16")
+            continue
+
         if not is_text_generation(model):
             log_merge(model.id, False, "not_text")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
             log_merge(model.id, False, "nearly_equal")
-            continue
-
-        if not is_bf16(model):
-            log_merge(model.id, False, "not_bf16")
             continue
 
         evaluate_current(f"outputs/step_{merging_step}/current")
@@ -103,6 +107,16 @@ def are_nearly_equal(sd1, sd2):
         if sd1[key].shape != sd2[key].shape:
             return False
         if not torch.allclose(sd1[key], sd2[key]):
+            return False
+    return True
+
+
+def dtypes_match(sd1, sd2):
+    """Check if two state dictionaries have the same dtypes."""
+    for key in sd1.keys():
+        if key not in sd2:
+            return False
+        if sd1[key].dtype != sd2[key].dtype:
             return False
     return True
 
