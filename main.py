@@ -18,9 +18,9 @@ from merge import create_merge_instance
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
+    print("Retrieving models...")
     api = HfApi()
     base_model_id = cfg.base_model
-    print("Retrieving models...")
 
     models = api.list_models(
         filter=f"base_model:finetune:{base_model_id}",
