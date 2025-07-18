@@ -20,6 +20,7 @@ from merge import create_merge_instance
 def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
+    print("Retrieving models...")
 
     models = api.list_models(
         filter=f"base_model:finetune:{base_model_id}",
@@ -29,6 +30,7 @@ def main(cfg: DictConfig):
         gated=False,
         expand=["downloads", "safetensors", "pipeline_tag"],
     )
+    print(list(models))
     models = [model for model in models if is_bf16(model)]
     print(f"Found {len(models)} BF16 models to merge.")
 
@@ -78,6 +80,7 @@ def main(cfg: DictConfig):
 
 def is_bf16(model):
     """Check if a model is bf16."""
+    print(model.safetensors.parameters.keys())
     return set(model.safetensors.parameters.keys()) == {"BF16"}
 
 
