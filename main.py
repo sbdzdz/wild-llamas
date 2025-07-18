@@ -1,5 +1,6 @@
 """Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
 
+print("Retrieving models...")
 import gc
 import subprocess
 import shutil
@@ -18,7 +19,6 @@ from merge import create_merge_instance
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
-    print("Retrieving models...")
     api = HfApi()
     base_model_id = cfg.base_model
 
