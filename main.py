@@ -80,8 +80,9 @@ def main(cfg: DictConfig):
 
 def is_bf16(model):
     """Check if a model is bf16."""
-    print(model.safetensors.parameters.keys())
-    return set(model.safetensors.parameters.keys()) == {"BF16"}
+    return model.safetensors is not None and set(
+        model.safetensors.parameters.keys()
+    ) == {"BF16"}
 
 
 def is_text_generation(model):
