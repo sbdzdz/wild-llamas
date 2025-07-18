@@ -12,6 +12,7 @@ from huggingface_hub import HfApi, snapshot_download
 from omegaconf import DictConfig
 from transformers import AutoModelForCausalLM
 import pandas as pd
+import csv
 
 from merge import create_merge_instance
 
@@ -48,22 +49,22 @@ def main(cfg: DictConfig):
         current_model_state_dict = load(model.id, "current_model")
 
         if current_model_state_dict is None or not is_text_generation(model):
-            print(f"Model {model.id} is not a text generation model. Skipping.")
+            log_merge(model.id, False, "not_text")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
-            print(f"Model {model.id} is nearly equal to the base model. Skipping.")
+            log_merge(model.id, False, "nearly_equal")
             continue
 
         if not is_bf16(model):
-            print(f"Model {model.id} is not bf16. Skipping.")
+            log_merge(model.id, False, "not_bf16")
             continue
 
         evaluate_current(f"outputs/step_{merging_step}/current")
 
         accuracy = get_accuracy(f"outputs/step_{merging_step}/current")
         if accuracy < 50.0:
-            print(f"Model {model.id} has poor performance: {accuracy:.1f}. Skipping.")
+            log_merge(model.id, False, "poor_performance", accuracy)
             continue
 
         print(f"Merging {model.id}...")
@@ -71,6 +72,7 @@ def main(cfg: DictConfig):
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         evaluate_merged(f"outputs/step_{merging_step}/merged")
+        log_merge(model.id, True, "", accuracy)
 
         merging_step += 1
         if merging_step > cfg.model_limit:
@@ -171,6 +173,18 @@ def get_accuracy(work_dir):
         df["current_model"].replace("-", 0), errors="coerce"
     )
     return df["current_model"].mean()
+
+
+def log_merge(model_id, merged, reason="", accuracy=None):
+    log_file = Path(__file__).parent / "outputs/merge_log.csv"
+    log_file.parent.mkdir(exist_ok=True)
+    if not log_file.exists():
+        with open(log_file, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["model_id", "merged", "reason", "accuracy"])
+    with open(log_file, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([model_id, merged, reason, accuracy])
 
 
 if __name__ == "__main__":
