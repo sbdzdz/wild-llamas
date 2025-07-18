@@ -48,7 +48,10 @@ def main(cfg: DictConfig):
         download(model.id, "current_model")
         current_model_state_dict = load(model.id, "current_model")
 
-        if current_model_state_dict is None or not is_text_generation(model):
+        if current_model_state_dict is None:
+            continue
+
+        if not is_text_generation(model):
             log_merge(model.id, False, "not_text")
             continue
 
@@ -150,7 +153,10 @@ def load(model_id, folder):
         )
         return model.state_dict()
     except ImportError:
-        print(f"Model {model_id} requires additional dependencies. Skipping.")
+        log_merge(model_id, False, "import_error")
+        return None
+    except ValueError:
+        log_merge(model_id, False, "value_error")
         return None
 
 
