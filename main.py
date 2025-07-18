@@ -30,7 +30,8 @@ def main(cfg: DictConfig):
         expand=["downloads", "safetensors", "pipeline_tag"],
     )
     print(list(models))
-    models = [model for model in models if is_bf16(model)]
+    # models = [model for model in models if is_bf16(model)]
+    is_bf16(models[0])
     print(f"Found {len(models)} BF16 models to merge.")
 
     download(base_model_id, "current_model")
