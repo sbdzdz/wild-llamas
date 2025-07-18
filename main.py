@@ -29,7 +29,6 @@ def main(cfg: DictConfig):
         gated=False,
         expand=["downloads", "safetensors", "pipeline_tag"],
     )
-    print(f"Found {len(models)} BF16 models to merge.")
 
     download(base_model_id, "current_model")
     shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
