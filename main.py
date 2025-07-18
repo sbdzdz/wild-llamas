@@ -25,7 +25,6 @@ def main(cfg: DictConfig):
         filter=f"base_model:finetune:{base_model_id}",
         sort="downloads",
         direction=-1,
-        limit=cfg.model_limit,
         gated=False,
         expand=["downloads", "safetensors", "pipeline_tag"],
     )
@@ -72,7 +71,10 @@ def main(cfg: DictConfig):
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         evaluate_merged(f"outputs/step_{merging_step}/merged")
+
         merging_step += 1
+        if merging_step > cfg.model_limit:
+            break
 
         gc.collect()
         torch.cuda.empty_cache()
