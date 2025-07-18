@@ -31,7 +31,7 @@ def main(cfg: DictConfig):
     )
     print(list(models))
     # models = [model for model in models if is_bf16(model)]
-    is_bf16(models[0])
+    is_bf16(next(models))
     print(f"Found {len(models)} BF16 models to merge.")
 
     download(base_model_id, "current_model")
