@@ -5,6 +5,7 @@ import subprocess
 import shutil
 from copy import deepcopy
 from pathlib import Path
+import os
 
 import hydra
 import torch
@@ -32,7 +33,11 @@ def main(cfg: DictConfig):
 
     download(base_model_id, "current_model")
     shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
-    evaluate_current("outputs/step_0/current")
+    current_accuracy = evaluate(
+        model_path="models/current_model",
+        work_dir="outputs/step_0/current",
+    )
+    log_merge(base_model_id, "merged", current_accuracy, current_accuracy)
 
     base_model = AutoModelForCausalLM.from_pretrained(
         "models/current_model", device_map="cpu", trust_remote_code=True
@@ -52,34 +57,39 @@ def main(cfg: DictConfig):
             continue
 
         if not dtypes_match(base_state_dict, current_model_state_dict):
-            log_merge(model.id, False, "dtypes_mismatch")
+            log_merge(model.id, "dtypes_mismatch")
             continue
 
         if not is_bf16(model):
-            log_merge(model.id, False, "not_bf16")
+            log_merge(model.id, "not_bf16")
             continue
 
         if not is_text_generation(model):
-            log_merge(model.id, False, "not_text")
+            log_merge(model.id, "not_text")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
-            log_merge(model.id, False, "nearly_equal")
+            log_merge(model.id, "nearly_equal")
             continue
 
-        evaluate_current(f"outputs/step_{merging_step}/current")
+        current_accuracy = evaluate(
+            model_path="models/current_model",
+            work_dir=f"outputs/step_{merging_step}/current",
+        )
 
-        accuracy = get_accuracy(f"outputs/step_{merging_step}/current")
-        if accuracy < 50.0:
-            log_merge(model.id, False, "poor_performance", accuracy)
+        if current_accuracy < 50.0:
+            log_merge(model.id, "poor_performance", current_accuracy)
             continue
 
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        evaluate_merged(f"outputs/step_{merging_step}/merged")
-        log_merge(model.id, True, "", accuracy)
+        merged_accuracy = evaluate(
+            model_path="models/merged_model",
+            work_dir=f"outputs/step_{merging_step}/merged",
+        )
+        log_merge(model.id, "merged", current_accuracy, merged_accuracy)
 
         merging_step += 1
         if merging_step > cfg.model_limit:
@@ -133,53 +143,25 @@ def download(model_id, folder):
     print(f"Downloaded {model_id}.")
 
 
-def evaluate_current(work_dir):
-    result = subprocess.run(
+def evaluate(model_path, work_dir):
+    set_eval_model_symlink(model_path)
+    subprocess.run(
         [
             "opencompass",
-            "eval_current.py",
+            "eval_llama.py",
             "--work-dir",
             work_dir,
         ],
         check=True,
     )
-    return result
+    return get_accuracy(work_dir)
 
 
-def evaluate_merged(work_dir):
-    result = subprocess.run(
-        [
-            "opencompass",
-            "eval_merged.py",
-            "--work-dir",
-            work_dir,
-        ],
-        check=True,
-    )
-    return result
-
-
-def load(model_id, folder):
-    """Load a model from the specified folder. Returns None if loading fails."""
-    try:
-        model = AutoModelForCausalLM.from_pretrained(
-            f"models/{folder}", device_map="cpu", trust_remote_code=True
-        )
-        return model.state_dict()
-    except ImportError:
-        log_merge(model_id, False, "import_error")
-        return None
-    except ValueError:
-        log_merge(model_id, False, "value_error")
-        return None
-
-
-def save(model, folder):
-    """Save the merged model with a numbered name."""
-    merged_model_path = Path(f"models/{folder}")
-    merged_model_path.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(merged_model_path)
-    print(f"Saved merged model to {merged_model_path}")
+def set_eval_model_symlink(target):
+    symlink_path = "models/eval_model"
+    if os.path.islink(symlink_path) or os.path.exists(symlink_path):
+        os.unlink(symlink_path)
+    os.symlink(target, symlink_path)
 
 
 def get_accuracy(work_dir):
@@ -195,16 +177,41 @@ def get_accuracy(work_dir):
     return df["current_model"].mean()
 
 
-def log_merge(model_id, merged, reason="", accuracy=None):
+def load(model_id, folder):
+    """Load a model from the specified folder. Returns None if loading fails."""
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            f"models/{folder}", device_map="cpu", trust_remote_code=True
+        )
+        return model.state_dict()
+    except ImportError:
+        log_merge(model_id, "import_error")
+        return None
+    except ValueError:
+        log_merge(model_id, "value_error")
+        return None
+
+
+def save(model, folder):
+    """Save the merged model with a numbered name."""
+    merged_model_path = Path(f"models/{folder}")
+    merged_model_path.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(merged_model_path)
+    print(f"Saved merged model to {merged_model_path}")
+
+
+def log_merge(model_id, status, current_accuracy=None, merged_accuracy=None):
     log_file = Path(__file__).parent / "outputs/merge_log.csv"
     log_file.parent.mkdir(exist_ok=True)
     if not log_file.exists():
         with open(log_file, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["model_id", "merged", "reason", "accuracy"])
+            writer.writerow(
+                ["model_id", "status", "current_accuracy", "merged_accuracy"]
+            )
     with open(log_file, "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow([model_id, merged, reason, accuracy])
+        writer.writerow([model_id, status, current_accuracy, merged_accuracy])
 
 
 if __name__ == "__main__":

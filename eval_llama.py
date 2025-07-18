@@ -19,8 +19,8 @@ datasets = [
 models = [
     dict(
         type=TurboMindModelwithChatTemplate,
-        abbr="merged_model",
-        path="models/merged_model",
+        abbr="eval_model",
+        path="models/eval_model",
         engine_config=dict(max_batch_size=16, tp=1),
         gen_config=dict(top_k=1, temperature=1e-6, top_p=0.9, max_new_tokens=32),
         max_seq_len=16384,
