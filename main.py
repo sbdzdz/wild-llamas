@@ -29,9 +29,6 @@ def main(cfg: DictConfig):
         gated=False,
         expand=["downloads", "safetensors", "pipeline_tag"],
     )
-    print(list(models))
-    # models = [model for model in models if is_bf16(model)]
-    is_bf16(next(models))
     print(f"Found {len(models)} BF16 models to merge.")
 
     download(base_model_id, "current_model")
@@ -50,14 +47,18 @@ def main(cfg: DictConfig):
     merging_step = 1
     for model in models:
         download(model.id, "current_model")
-
         current_model_state_dict = load(model.id, "current_model")
+
         if current_model_state_dict is None or not is_text_generation(model):
             print(f"Model {model.id} is not a text generation model. Skipping.")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
             print(f"Model {model.id} is nearly equal to the base model. Skipping.")
+            continue
+
+        if not is_bf16(model):
+            print(f"Model {model.id} is not bf16. Skipping.")
             continue
 
         evaluate_current(f"outputs/step_{merging_step}/current")
