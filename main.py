@@ -133,10 +133,15 @@ def dtypes_match(sd1, sd2):
 
 def download(model_id, folder):
     """Download a model from HuggingFace Hub to a fixed directory."""
-    print(f"Downloading {model_id} to models/{folder}...")
+    folder_path = f"models/{folder}"
+
+    if os.path.exists(folder_path):
+        shutil.rmtree(folder_path)
+
+    print(f"Downloading {model_id} to {folder_path}...")
     snapshot_download(
         repo_id=model_id,
-        local_dir=f"models/{folder}",
+        local_dir=folder_path,
         max_workers=1,
         local_dir_use_symlinks=False,
     )
