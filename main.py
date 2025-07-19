@@ -171,10 +171,8 @@ def get_accuracy(work_dir):
     summary_dir = timestamp_dir / "summary"
     csv_file = next(summary_dir.glob("*.csv"))
     df = pd.read_csv(csv_file)
-    df["current_model"] = pd.to_numeric(
-        df["current_model"].replace("-", 0), errors="coerce"
-    )
-    return df["current_model"].mean()
+    df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
+    return df["eval_model"].mean()
 
 
 def load(model_id, folder):
