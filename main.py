@@ -188,6 +188,9 @@ def load(model_id, folder):
     except ValueError:
         log_merge(model_id, "value_error")
         return None
+    except RuntimeError as e:
+        log_merge(model_id, "runtime_error", str(e))
+        return None
 
 
 def save(model, folder):
