@@ -5,7 +5,6 @@ import subprocess
 import shutil
 from copy import deepcopy
 from pathlib import Path
-import os
 
 import hydra
 import torch
@@ -22,6 +21,8 @@ from merge import create_merge_instance
 def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
+
+    skipped_models = load_skipped_models()
 
     models = api.list_models(
         filter=f"base_model:finetune:{base_model_id}",
@@ -50,6 +51,10 @@ def main(cfg: DictConfig):
 
     merging_step = 1
     for model in models:
+        if model.id in skipped_models:
+            print(f"Skipping {model.id} (previously skipped)")
+            continue
+
         download(model.id, "current_model")
         current_model_state_dict = load(model.id, "current_model")
 
@@ -99,6 +104,16 @@ def main(cfg: DictConfig):
         torch.cuda.empty_cache()
 
 
+def load_skipped_models():
+    """Load list of model IDs that have been skipped from skipped_models.csv."""
+    skipped_file = Path(__file__).parent / "skipped_models.csv"
+    if not skipped_file.exists():
+        return set()
+
+    df = pd.read_csv(skipped_file)
+    return set(df["model_id"].tolist())
+
+
 def is_bf16(model):
     """Check if a model is bf16."""
     return model.safetensors is not None and set(
@@ -133,15 +148,15 @@ def dtypes_match(sd1, sd2):
 
 def download(model_id, folder):
     """Download a model from HuggingFace Hub to a fixed directory."""
-    folder_path = f"models/{folder}"
+    folder_path = Path(f"models/{folder}")
 
-    if os.path.exists(folder_path):
+    if folder_path.exists():
         shutil.rmtree(folder_path)
 
     print(f"Downloading {model_id} to {folder_path}...")
     snapshot_download(
         repo_id=model_id,
-        local_dir=folder_path,
+        local_dir=str(folder_path),
         max_workers=1,
         local_dir_use_symlinks=False,
     )
@@ -163,11 +178,11 @@ def evaluate(model_path, work_dir):
 
 
 def set_eval_model_symlink(target):
-    symlink_path = "models/eval_model"
-    if os.path.islink(symlink_path) or os.path.exists(symlink_path):
-        os.unlink(symlink_path)
-    target_abs = os.path.abspath(target)
-    os.symlink(target_abs, symlink_path)
+    symlink_path = Path("models/eval_model")
+    if symlink_path.is_symlink() or symlink_path.exists():
+        symlink_path.unlink()
+    target_abs = Path(target).resolve()
+    symlink_path.symlink_to(target_abs)
 
 
 def get_accuracy(work_dir):
@@ -219,6 +234,21 @@ def log_merge(model_id, status, current_accuracy=None, merged_accuracy=None):
     with open(log_file, "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([model_id, status, current_accuracy, merged_accuracy])
+
+    if status != "merged":
+        save_skipped_model(model_id, status)
+
+
+def save_skipped_model(model_id, reason):
+    """Save a skipped model to skipped_models.csv."""
+    skipped_file = Path(__file__).parent / "skipped_models.csv"
+
+    if not skipped_file.exists():
+        skipped_file.write_text("model_id,reason\n")
+
+    with skipped_file.open("a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([model_id, reason])
 
 
 if __name__ == "__main__":
