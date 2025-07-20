@@ -12,6 +12,9 @@ def get_avg_acc(step_dir, model_type):
     summary_dir = timestamp_dir / "summary"
     csv_files = list(summary_dir.glob("*.csv"))
 
+    if not csv_files:
+        return None
+
     df = pd.read_csv(csv_files[0])
     df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
     return df["eval_model"].mean()
@@ -25,7 +28,6 @@ def load_summary_data():
     step_dirs = sorted([d for d in outputs_dir.iterdir() if d.name.startswith("step_")])
 
     for step_dir in step_dirs:
-        print(step_dir)
         step_num = int(step_dir.name.split("_")[1])
 
         current_avg_acc = get_avg_acc(step_dir, "current")
