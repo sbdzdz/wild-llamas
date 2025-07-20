@@ -8,24 +8,13 @@ from pathlib import Path
 def get_avg_acc(step_dir, model_type):
     """Get average accuracy for a specific model type from summary CSV."""
     model_step_dir = step_dir / model_type
-    if not model_step_dir.exists():
-        return None
-    
     timestamp_dir = sorted(model_step_dir.iterdir(), reverse=True)[0]
     summary_dir = timestamp_dir / "summary"
     csv_files = list(summary_dir.glob("*.csv"))
-    
-    if not csv_files:
-        return None
-    
+
     df = pd.read_csv(csv_files[0])
-    column_name = f"{model_type}_model"
-    
-    if df is None or column_name not in df.columns:
-        return None
-    
-    df[column_name] = pd.to_numeric(df[column_name].replace("-", 0), errors="coerce")
-    return df[column_name].mean()
+    df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
+    return df["eval_model"].mean()
 
 
 def load_summary_data():
@@ -37,7 +26,7 @@ def load_summary_data():
 
     for step_dir in step_dirs:
         step_num = int(step_dir.name.split("_")[1])
-        
+
         current_avg_acc = get_avg_acc(step_dir, "current")
         merged_avg_acc = get_avg_acc(step_dir, "merged")
         if step_num == 0:
