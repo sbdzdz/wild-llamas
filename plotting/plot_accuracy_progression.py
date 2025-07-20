@@ -8,6 +8,10 @@ from pathlib import Path
 def get_avg_acc(step_dir, model_type):
     """Get average accuracy for a specific model type from summary CSV."""
     model_step_dir = step_dir / model_type
+
+    if not model_step_dir.exists():
+        return None
+
     timestamp_dir = sorted(model_step_dir.iterdir(), reverse=True)[0]
     summary_dir = timestamp_dir / "summary"
     csv_files = list(summary_dir.glob("*.csv"))
