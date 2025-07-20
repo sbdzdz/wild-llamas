@@ -166,7 +166,8 @@ def set_eval_model_symlink(target):
     symlink_path = "models/eval_model"
     if os.path.islink(symlink_path) or os.path.exists(symlink_path):
         os.unlink(symlink_path)
-    os.symlink(target, symlink_path)
+    target_abs = os.path.abspath(target)
+    os.symlink(target_abs, symlink_path)
 
 
 def get_accuracy(work_dir):
