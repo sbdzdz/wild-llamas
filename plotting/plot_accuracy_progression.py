@@ -3,6 +3,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+import argparse
 
 
 def get_avg_acc(step_dir, model_type):
@@ -50,9 +51,11 @@ def load_summary_data():
     return step_data
 
 
-def create_plot(step_data):
+def create_plot(step_data, num_steps=None):
     """Create the accuracy progression plot."""
     steps = sorted(step_data.keys())
+    if num_steps is not None:
+        steps = steps[:num_steps]
     current_accuracies = [step_data[step]["current_model"] for step in steps]
     merged_accuracies = [step_data[step]["merged_model"] for step in steps]
 
@@ -117,9 +120,19 @@ def create_plot(step_data):
 
 def main():
     """Main function to load data and create plot."""
+    parser = argparse.ArgumentParser(
+        description="Plot accuracy progression across model merging steps."
+    )
+    parser.add_argument(
+        "--num_steps",
+        type=int,
+        default=None,
+        help="Number of steps to plot (default: all)",
+    )
+    args = parser.parse_args()
     step_data = load_summary_data()
     print(f"\nFound data for {len(step_data)} steps")
-    create_plot(step_data)
+    create_plot(step_data, num_steps=args.num_steps)
 
 
 if __name__ == "__main__":
