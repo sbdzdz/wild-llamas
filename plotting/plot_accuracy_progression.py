@@ -51,7 +51,7 @@ def load_summary_data():
     return step_data
 
 
-def create_plot(step_data, num_steps=None):
+def create_plot(step_data, num_steps=None, ylim=None):
     """Create the accuracy progression plot."""
     steps = sorted(step_data.keys())
     if num_steps is not None:
@@ -91,6 +91,9 @@ def create_plot(step_data, num_steps=None):
 
     plt.xticks(steps)
 
+    if ylim is not None:
+        plt.ylim(ylim)
+
     for step, current, merged in zip(steps, current_accuracies, merged_accuracies):
         plt.annotate(
             f"{current:.1f}",
@@ -129,10 +132,19 @@ def main():
         default=None,
         help="Number of steps to plot (default: all)",
     )
+    parser.add_argument(
+        "--ylim",
+        nargs=2,
+        type=float,
+        default=None,
+        metavar=("YMIN", "YMAX"),
+        help="Set y-axis limits, e.g. --ylim 0 100",
+    )
     args = parser.parse_args()
     step_data = load_summary_data()
     print(f"\nFound data for {len(step_data)} steps")
-    create_plot(step_data, num_steps=args.num_steps)
+    ylim = tuple(args.ylim) if args.ylim is not None else None
+    create_plot(step_data, num_steps=args.num_steps, ylim=ylim)
 
 
 if __name__ == "__main__":
