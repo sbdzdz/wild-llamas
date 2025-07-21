@@ -80,7 +80,7 @@ def create_plot(step_data, num_steps=None):
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
-    plt.ylabel("Average Accuracy (%) over MMLU and CMMLU", fontsize=12)
+    plt.ylabel("MMLU Accuracy", fontsize=12)
     plt.title(
         "LLaMA-3.1-8B-Instruct Accuracy Across Merging Steps",
         fontsize=14,
