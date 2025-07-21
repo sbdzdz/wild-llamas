@@ -49,10 +49,18 @@ def main(cfg: DictConfig):
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
 
-    merging_step = 1
+    merging_step = 0
     for model in models:
         if model.id in skipped_models:
             print(f"Skipping {model.id} (previously skipped)")
+            continue
+
+        if not is_bf16(model):
+            log_merge(model.id, "not_bf16")
+            continue
+
+        if not is_text_generation(model):
+            log_merge(model.id, "not_text")
             continue
 
         download(model.id, "current_model")
@@ -65,27 +73,23 @@ def main(cfg: DictConfig):
             log_merge(model.id, "dtypes_mismatch")
             continue
 
-        if not is_bf16(model):
-            log_merge(model.id, "not_bf16")
-            continue
-
-        if not is_text_generation(model):
-            log_merge(model.id, "not_text")
-            continue
-
         if are_nearly_equal(base_state_dict, current_model_state_dict):
             log_merge(model.id, "nearly_equal")
             continue
 
+        if Path("outputs/current").exists():
+            shutil.rmtree("outputs/current")
+
         current_accuracy = evaluate(
             model_path="models/current_model",
-            work_dir=f"outputs/step_{merging_step}/current",
+            work_dir="outputs/current",
         )
 
         if current_accuracy < 50.0:
             log_merge(model.id, "poor_performance", current_accuracy)
             continue
 
+        merging_step += 1
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
@@ -94,9 +98,9 @@ def main(cfg: DictConfig):
             model_path="models/merged_model",
             work_dir=f"outputs/step_{merging_step}/merged",
         )
+        shutil.copytree("outputs/current", f"outputs/step_{merging_step}/current")
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
 
-        merging_step += 1
         if merging_step > cfg.model_limit:
             break
 
@@ -188,8 +192,12 @@ def set_eval_model_symlink(target):
 def get_accuracy(work_dir):
     """Get the average accuracy from evaluation results."""
     step_dir = Path(work_dir)
-    timestamp_dir = next(d for d in step_dir.iterdir() if d.is_dir())
-    summary_dir = timestamp_dir / "summary"
+    subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
+    if len(subdirs) != 1:
+        raise RuntimeError(
+            f"Expected exactly one directory in {work_dir}, found {len(subdirs)}"
+        )
+    summary_dir = subdirs[0] / "summary"
     csv_file = next(summary_dir.glob("*.csv"))
     df = pd.read_csv(csv_file)
     df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
@@ -215,11 +223,13 @@ def load(model_id, folder):
 
 
 def save(model, folder):
-    """Save the merged model with a numbered name."""
-    merged_model_path = Path(f"models/{folder}")
-    merged_model_path.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(merged_model_path)
-    print(f"Saved merged model to {merged_model_path}")
+    """Save the merged model."""
+    model_path = Path(f"models/{folder}")
+    if model_path.exists():
+        shutil.rmtree(model_path)
+    model_path.mkdir(parents=True)
+    model.save_pretrained(model_path)
+    print(f"Saved merged model to {model_path}")
 
 
 def log_merge(model_id, status, current_accuracy=None, merged_accuracy=None):
