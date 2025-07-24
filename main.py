@@ -77,20 +77,20 @@ def main(cfg: DictConfig):
             log_merge(model.id, "nearly_equal")
             continue
 
-        if Path("outputs/current").exists():
-            shutil.rmtree("outputs/current")
-
         current_accuracy = evaluate(
             model_path="models/current_model",
-            work_dir="outputs/current",
+            work_dir="outputs/tmp",
         )
 
         if current_accuracy < 50.0:
             log_merge(model.id, "poor_performance", current_accuracy)
+            shutil.rmtree("outputs/tmp")
             continue
 
         merging_step += 1
         print(f"Merging {model.id}...")
+        shutil.copytree("outputs/tmp", f"outputs/step_{merging_step}/current")
+        shutil.rmtree("outputs/tmp")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
@@ -98,7 +98,6 @@ def main(cfg: DictConfig):
             model_path="models/merged_model",
             work_dir=f"outputs/step_{merging_step}/merged",
         )
-        shutil.copytree("outputs/current", f"outputs/step_{merging_step}/current")
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
 
         if merging_step > cfg.model_limit:
