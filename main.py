@@ -225,8 +225,6 @@ def load(model_id, folder):
 def save(model, folder):
     """Save the merged model."""
     model_path = Path(f"models/{folder}")
-    if model_path.exists():
-        shutil.rmtree(model_path)
     model_path.mkdir(parents=True)
     model.save_pretrained(model_path)
     print(f"Saved merged model to {model_path}")
