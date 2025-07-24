@@ -225,7 +225,7 @@ def load(model_id, folder):
 def save(model, folder):
     """Save the merged model."""
     model_path = Path(f"models/{folder}")
-    model_path.mkdir(parents=True)
+    model_path.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(model_path)
     print(f"Saved merged model to {model_path}")
 
