@@ -72,7 +72,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         label="Base Model",
         s=marker_size,
         color=base_color,
-        zorder=6,
+        zorder=3,
         edgecolor="none",
         linewidth=1.2,
     )
@@ -82,7 +82,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         label="Current Model",
         s=marker_size,
         color=current_color,
-        zorder=5,
+        zorder=0,
         edgecolor="none",
     )
     plt.plot(
@@ -92,7 +92,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         linewidth=2,
         color=merged_color,
         alpha=0.4,
-        zorder=7,
+        zorder=1,
     )
     plt.scatter(
         steps[1:],
@@ -101,7 +101,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         s=marker_size,
         color=merged_color,
         alpha=1.0,
-        zorder=8,
+        zorder=2,
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
@@ -112,7 +112,8 @@ def create_plot(step_data, num_steps=None, ylim=None):
         fontweight="bold",
     )
     plt.legend(fontsize=11)
-    plt.grid(True, alpha=0.3)
+    plt.grid(axis="x", visible=False)
+    plt.grid(axis="y", alpha=0.3)
 
     plt.xticks(steps)
 
@@ -127,7 +128,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
                 f"{current:.1f}",
                 (step, current),
                 textcoords="offset points",
-                xytext=(20, -20),
+                xytext=(-10, -15),
                 ha="center",
                 fontsize=8,
                 color=base_color,
