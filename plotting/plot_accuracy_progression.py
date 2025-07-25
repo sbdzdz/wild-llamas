@@ -101,6 +101,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         color=merged_color,
         alpha=1.0,
         zorder=2,
+        edgecolor="none",
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
