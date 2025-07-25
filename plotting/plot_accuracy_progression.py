@@ -144,15 +144,15 @@ def create_plot(step_data, num_steps=None, ylim=None):
                 fontsize=8,
                 color=current_color,
             )
-        plt.annotate(
-            f"{merged:.1f}",
-            (step, merged),
-            textcoords="offset points",
-            xytext=(-5, 10),
-            ha="center",
-            fontsize=8,
-            color=merged_color,
-        )
+            plt.annotate(
+                f"{merged:.1f}",
+                (step, merged),
+                textcoords="offset points",
+                xytext=(-5, 10),
+                ha="center",
+                fontsize=8,
+                color=merged_color,
+            )
 
     plt.tight_layout()
     figures_dir = Path("figures")
