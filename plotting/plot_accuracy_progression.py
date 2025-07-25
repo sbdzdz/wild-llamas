@@ -74,7 +74,6 @@ def create_plot(step_data, num_steps=None, ylim=None):
         color=base_color,
         zorder=3,
         edgecolor="none",
-        linewidth=1.2,
     )
     plt.scatter(
         steps[1:],
