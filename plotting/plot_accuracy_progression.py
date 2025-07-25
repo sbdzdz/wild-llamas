@@ -61,13 +61,32 @@ def create_plot(step_data, num_steps=None, ylim=None):
 
     plt.figure(figsize=(10, 6))
 
+    cmap = plt.get_cmap("Dark2")
+    base_color = cmap(0)
     plt.scatter(
-        steps,
-        current_accuracies,
+        [steps[0]],
+        [current_accuracies[0]],
+        label="Base Model",
+        s=70,
+        color=base_color,
+        zorder=6,
+        edgecolor="black",
+        linewidth=1.2,
+    )
+    plt.scatter(
+        steps[1:],
+        current_accuracies[1:],
         label="Current Model",
         s=50,
-        color="#1f77b4",
         zorder=5,
+    )
+    plt.plot(
+        steps,
+        current_accuracies,
+        "-",
+        linewidth=2,
+        alpha=0.3,
+        zorder=4,
     )
     plt.plot(
         steps,
@@ -76,7 +95,6 @@ def create_plot(step_data, num_steps=None, ylim=None):
         label="Merged Model",
         linewidth=2,
         markersize=6,
-        color="#ff7f0e",
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
@@ -94,16 +112,29 @@ def create_plot(step_data, num_steps=None, ylim=None):
     if ylim is not None:
         plt.ylim(ylim)
 
-    for step, current, merged in zip(steps, current_accuracies, merged_accuracies):
-        plt.annotate(
-            f"{current:.1f}",
-            (step, current),
-            textcoords="offset points",
-            xytext=(5, -15),
-            ha="center",
-            fontsize=8,
-            color="#1f77b4",
-        )
+    for i, (step, current, merged) in enumerate(
+        zip(steps, current_accuracies, merged_accuracies)
+    ):
+        if i == 0:
+            plt.annotate(
+                f"{current:.1f}",
+                (step, current),
+                textcoords="offset points",
+                xytext=(5, -15),
+                ha="center",
+                fontsize=8,
+                color=base_color,
+                fontweight="bold",
+            )
+        else:
+            plt.annotate(
+                f"{current:.1f}",
+                (step, current),
+                textcoords="offset points",
+                xytext=(5, -15),
+                ha="center",
+                fontsize=8,
+            )
         plt.annotate(
             f"{merged:.1f}",
             (step, merged),
@@ -111,7 +142,6 @@ def create_plot(step_data, num_steps=None, ylim=None):
             xytext=(-5, 10),
             ha="center",
             fontsize=8,
-            color="#ff7f0e",
         )
 
     plt.tight_layout()
