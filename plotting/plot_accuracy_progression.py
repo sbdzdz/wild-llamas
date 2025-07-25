@@ -63,6 +63,8 @@ def create_plot(step_data, num_steps=None, ylim=None):
 
     cmap = plt.get_cmap("Dark2")
     base_color = cmap(0)
+    current_color = cmap(1)
+    merged_color = cmap(2)
     plt.scatter(
         [steps[0]],
         [current_accuracies[0]],
@@ -70,7 +72,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         s=70,
         color=base_color,
         zorder=6,
-        edgecolor="black",
+        edgecolor="none",
         linewidth=1.2,
     )
     plt.scatter(
@@ -78,23 +80,30 @@ def create_plot(step_data, num_steps=None, ylim=None):
         current_accuracies[1:],
         label="Current Model",
         s=50,
+        color=current_color,
         zorder=5,
-    )
-    plt.plot(
-        steps,
-        current_accuracies,
-        "-",
-        linewidth=2,
-        alpha=0.3,
-        zorder=4,
+        edgecolor="none",
     )
     plt.plot(
         steps,
         merged_accuracies,
-        "s-",
-        label="Merged Model",
+        "-",
         linewidth=2,
+        color=merged_color,
+        alpha=0.4,
+        zorder=3,
+    )
+    plt.plot(
+        steps,
+        merged_accuracies,
+        "s",
+        label="Merged Model",
+        linewidth=0,
         markersize=6,
+        color=merged_color,
+        markerfacecolor=merged_color,
+        alpha=1.0,
+        zorder=4,
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
@@ -134,6 +143,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
                 xytext=(5, -15),
                 ha="center",
                 fontsize=8,
+                color=current_color,
             )
         plt.annotate(
             f"{merged:.1f}",
@@ -142,6 +152,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
             xytext=(-5, 10),
             ha="center",
             fontsize=8,
+            color=merged_color,
         )
 
     plt.tight_layout()
