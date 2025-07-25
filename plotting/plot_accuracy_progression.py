@@ -139,7 +139,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
                 f"{current:.1f}",
                 (step, current),
                 textcoords="offset points",
-                xytext=(5, -15),
+                xytext=(5, -20),
                 ha="center",
                 fontsize=8,
                 color=current_color,
