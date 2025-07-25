@@ -65,11 +65,12 @@ def create_plot(step_data, num_steps=None, ylim=None):
     base_color = cmap(0)
     current_color = cmap(1)
     merged_color = cmap(2)
+    marker_size = 50
     plt.scatter(
         [steps[0]],
         [current_accuracies[0]],
         label="Base Model",
-        s=100,
+        s=marker_size,
         color=base_color,
         zorder=6,
         edgecolor="none",
@@ -79,7 +80,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
         steps[1:],
         current_accuracies[1:],
         label="Current Model",
-        s=50,
+        s=marker_size,
         color=current_color,
         zorder=5,
         edgecolor="none",
@@ -91,19 +92,16 @@ def create_plot(step_data, num_steps=None, ylim=None):
         linewidth=2,
         color=merged_color,
         alpha=0.4,
-        zorder=3,
+        zorder=7,
     )
-    plt.plot(
-        steps,
-        merged_accuracies,
-        "s",
+    plt.scatter(
+        steps[1:],
+        merged_accuracies[1:],
         label="Merged Model",
-        linewidth=0,
-        markersize=6,
+        s=marker_size,
         color=merged_color,
-        markerfacecolor=merged_color,
         alpha=1.0,
-        zorder=4,
+        zorder=8,
     )
 
     plt.xlabel("Number of merged models", fontsize=12)
@@ -129,7 +127,7 @@ def create_plot(step_data, num_steps=None, ylim=None):
                 f"{current:.1f}",
                 (step, current),
                 textcoords="offset points",
-                xytext=(10, -20),
+                xytext=(20, -20),
                 ha="center",
                 fontsize=8,
                 color=base_color,
