@@ -1,8 +1,10 @@
 __pycache__/
 
 models/
-outputs*
+outputs/
 tmp/
 
 .vscode/
 .cache/
+
+*.out
