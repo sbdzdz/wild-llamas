@@ -10,7 +10,7 @@ To install the dependencies for this project:
 2. Install dependencies:
 
    ```bash
-   uv sync
+   uv sync --frozen
    ```
 
 This will set up your virtual environment with all required packages.
