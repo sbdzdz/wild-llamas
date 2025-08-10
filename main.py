@@ -1,4 +1,8 @@
-"""Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
+"""Find, download, merge, and evaluate finetunes for a base model.
+
+Find finetunes for the base model on HuggingFace, download them, evaluate each one,
+and incrementally merge those that pass checks into a running merged model.
+"""
 
 import gc
 import subprocess
