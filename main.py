@@ -71,7 +71,6 @@ def main(cfg: DictConfig):
             log_merge(model.id, "nearly_equal")
             continue
 
-        model_name = model.id.replace("/", "--")
         current_accuracy = evaluate(model.id)
 
         if current_accuracy < 50.0:
@@ -83,7 +82,9 @@ def main(cfg: DictConfig):
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        merged_accuracy = evaluate("merged_model", f"outputs/merged_model/step_{merging_step}")
+        merged_accuracy = evaluate(
+            "merged_model", f"outputs/merged_model/step_{merging_step}"
+        )
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
         save_merged_model(model.id)
 
