@@ -26,6 +26,8 @@ def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
 
+    setup_model_directory(cfg)
+
     skipped_models = load_skipped_models()
     models = fetch_or_load_models(api, base_model_id)
 
@@ -97,6 +99,27 @@ def main(cfg: DictConfig):
 
         gc.collect()
         torch.cuda.empty_cache()
+
+
+def setup_model_directory(cfg: DictConfig):
+    """Setup model directory and create symlink if model_dir is specified."""
+    models_dir = Path("models")
+
+    if cfg.get("model_dir"):
+        model_dir_path = Path(cfg.model_dir)
+        model_dir_path.mkdir(parents=True, exist_ok=True)
+
+        if models_dir.exists() or models_dir.is_symlink():
+            if models_dir.is_symlink():
+                models_dir.unlink()
+            else:
+                shutil.rmtree(models_dir)
+
+        models_dir.symlink_to(model_dir_path.resolve())
+        print(f"Created symlink: models -> {model_dir_path.resolve()}")
+        print(f"All models will be stored in: {model_dir_path.resolve()}")
+    else:
+        models_dir.mkdir(exist_ok=True)
 
 
 def load_skipped_models():
