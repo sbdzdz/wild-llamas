@@ -94,7 +94,6 @@ def main(cfg: DictConfig):
             overwrite=cfg.overwrite,
         )
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
-        save_merged_model(model.id)
 
         if merging_step > cfg.model_limit:
             break
@@ -132,28 +131,6 @@ def load_skipped_models():
 
     df = pd.read_csv(skipped_file)
     return set(df["model_id"].tolist())
-
-
-def load_merged_models():
-    """Load list of model IDs that have been successfully merged from merged_models.csv."""
-    merged_file = Path(__file__).parent / "merged_models.csv"
-    if not merged_file.exists():
-        return set()
-
-    df = pd.read_csv(merged_file)
-    return set(df["model_id"].tolist())
-
-
-def save_merged_model(model_id):
-    """Save a successfully merged model to merged_models.csv."""
-    merged_file = Path(__file__).parent / "merged_models.csv"
-
-    if not merged_file.exists():
-        merged_file.write_text("model_id\n")
-
-    with merged_file.open("a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([model_id])
 
 
 def fetch_or_load_models(api, base_model_id):
