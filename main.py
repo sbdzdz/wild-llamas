@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
     shutil.copytree(
         f"models/{base_model_name}", "models/merged_model", dirs_exist_ok=True
     )
-    current_accuracy = evaluate(base_model_id)
+    current_accuracy = evaluate(base_model_id, overwrite=cfg.overwrite)
     log_merge(base_model_id, "merged", current_accuracy, current_accuracy)
 
     base_model = AutoModelForCausalLM.from_pretrained(
@@ -77,7 +77,7 @@ def main(cfg: DictConfig):
             log_merge(model.id, "nearly_equal")
             continue
 
-        current_accuracy = evaluate(model.id)
+        current_accuracy = evaluate(model.id, overwrite=cfg.overwrite)
 
         if current_accuracy < 50.0:
             log_merge(model.id, "poor_performance", current_accuracy)
@@ -89,7 +89,9 @@ def main(cfg: DictConfig):
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         merged_accuracy = evaluate(
-            "merged_model", f"outputs/opencompass/merged_model/step_{merging_step}"
+            "merged_model",
+            f"outputs/opencompass/merged_model/step_{merging_step}",
+            overwrite=cfg.overwrite,
         )
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
         save_merged_model(model.id)
@@ -254,12 +256,13 @@ def download(model_id):
     print(f"Downloaded {model_id}.")
 
 
-def evaluate(model_id, work_dir=None):
+def evaluate(model_id, work_dir=None, overwrite=False):
     """Evaluate a model and return its accuracy.
 
     Args:
         model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
         work_dir: Optional work directory. If None, derives from model_id
+        overwrite: If True, overwrite any existing results in work_dir. If False, reuse if present.
     """
     if work_dir is None:
         model_name = model_id.replace("/", "--")
@@ -269,6 +272,12 @@ def evaluate(model_id, work_dir=None):
         model_name = Path(work_dir).parent.name
         model_path = f"models/{model_name}"
         work_dir = Path(work_dir)
+
+    if not overwrite and work_dir.exists():
+        return get_accuracy(work_dir)
+
+    if overwrite and work_dir.exists():
+        shutil.rmtree(work_dir)
 
     set_eval_model_symlink(model_path)
     work_dir.mkdir(parents=True, exist_ok=True)
