@@ -47,3 +47,6 @@ tokyotech-llm/Llama-3.1-Swallow-8B-v0.5,poor_performance
 zai-org/cogvlm2-llama3-caption,not_text
 watt-ai/watt-tool-8B,poor_performance
 TheFinAI/Fino1-8B,poor_performance
+Skywork/Skywork-o1-Open-Llama-3.1-8B,poor_performance
+IAAR-Shanghai/xVerify-8B-I,poor_performance
+aisingapore/Llama-SEA-LION-v3-8B,poor_performance
