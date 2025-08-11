@@ -69,7 +69,7 @@ def main(cfg: DictConfig):
             log_merge(model.id, "load_error")
             continue
 
-        if not dtypes_match(base_state_dict, current_model_state_dict):
+        if not tensors_match(base_state_dict, current_model_state_dict):
             log_merge(model.id, "dtypes_mismatch")
             continue
 
@@ -89,7 +89,7 @@ def main(cfg: DictConfig):
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         merged_accuracy = evaluate(
-            "merged_model", f"outputs/merged_model/step_{merging_step}"
+            "merged_model", f"outputs/opencompass/merged_model/step_{merging_step}"
         )
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
         save_merged_model(model.id)
@@ -205,9 +205,7 @@ def save_all_models(model_ids):
 
 def is_bf16(model):
     """Check if a model is bf16."""
-    return model.safetensors is not None and set(
-        model.safetensors.parameters.keys()
-    ) == {"BF16"}
+    return model.safetensors is None or "BF16" in model.safetensors.parameters.keys()
 
 
 def is_text_generation(model):
@@ -225,12 +223,14 @@ def are_nearly_equal(sd1, sd2):
     return True
 
 
-def dtypes_match(sd1, sd2):
-    """Check if two state dictionaries have the same dtypes."""
+def tensors_match(sd1, sd2):
+    """Check if two state dictionaries have matching keys, dtypes, and shapes."""
     for key in sd1.keys():
         if key not in sd2:
             return False
         if sd1[key].dtype != sd2[key].dtype:
+            return False
+        if sd1[key].shape != sd2[key].shape:
             return False
     return True
 
