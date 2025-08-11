@@ -1,4 +1,8 @@
-"""Find, download, merge, and evaluate Llama-3.1-8B-Instruct finetunes."""
+"""Find, download, merge, and evaluate finetunes for a base model.
+
+Find finetunes for the base model on HuggingFace, download them, evaluate each one,
+and incrementally merge those that pass checks into a running merged model.
+"""
 
 import gc
 import subprocess
@@ -22,26 +26,21 @@ def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
 
+    setup_model_directory(cfg)
+
     skipped_models = load_skipped_models()
+    models = fetch_or_load_models(api, base_model_id)
 
-    models = api.list_models(
-        filter=f"base_model:finetune:{base_model_id}",
-        sort="downloads",
-        direction=-1,
-        gated=False,
-        expand=["downloads", "safetensors", "pipeline_tag"],
+    download(base_model_id)
+    base_model_name = base_model_id.replace("/", "--")
+    shutil.copytree(
+        f"models/{base_model_name}", "models/merged_model", dirs_exist_ok=True
     )
-
-    download(base_model_id, "current_model")
-    shutil.copytree("models/current_model", "models/merged_model", dirs_exist_ok=True)
-    current_accuracy = evaluate(
-        model_path="models/current_model",
-        work_dir="outputs/step_0/current",
-    )
+    current_accuracy = evaluate(base_model_id)
     log_merge(base_model_id, "merged", current_accuracy, current_accuracy)
 
     base_model = AutoModelForCausalLM.from_pretrained(
-        "models/current_model", device_map="cpu", trust_remote_code=True
+        f"models/{base_model_name}", device_map="cpu", trust_remote_code=True
     )
     base_state_dict = deepcopy(base_model.state_dict())
     merged_state_dict = deepcopy(base_model.state_dict())
@@ -63,13 +62,14 @@ def main(cfg: DictConfig):
             log_merge(model.id, "not_text")
             continue
 
-        download(model.id, "current_model")
-        current_model_state_dict = load(model.id, "current_model")
+        download(model.id)
+        current_model_state_dict = load(model.id)
 
         if current_model_state_dict is None:
+            log_merge(model.id, "load_error")
             continue
 
-        if not dtypes_match(base_state_dict, current_model_state_dict):
+        if not tensors_match(base_state_dict, current_model_state_dict):
             log_merge(model.id, "dtypes_mismatch")
             continue
 
@@ -77,34 +77,49 @@ def main(cfg: DictConfig):
             log_merge(model.id, "nearly_equal")
             continue
 
-        current_accuracy = evaluate(
-            model_path="models/current_model",
-            work_dir="outputs/tmp",
-        )
+        current_accuracy = evaluate(model.id)
 
         if current_accuracy < 50.0:
             log_merge(model.id, "poor_performance", current_accuracy)
-            shutil.rmtree("outputs/tmp")
             continue
 
         merging_step += 1
         print(f"Merging {model.id}...")
-        shutil.copytree("outputs/tmp", f"outputs/step_{merging_step}/current")
-        shutil.rmtree("outputs/tmp")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
         merged_accuracy = evaluate(
-            model_path="models/merged_model",
-            work_dir=f"outputs/step_{merging_step}/merged",
+            "merged_model", f"outputs/opencompass/merged_model/step_{merging_step}"
         )
         log_merge(model.id, "merged", current_accuracy, merged_accuracy)
+        save_merged_model(model.id)
 
         if merging_step > cfg.model_limit:
             break
 
         gc.collect()
         torch.cuda.empty_cache()
+
+
+def setup_model_directory(cfg: DictConfig):
+    """Setup model directory and create symlink if model_dir is specified."""
+    models_dir = Path("models")
+
+    if cfg.get("model_dir"):
+        model_dir_path = Path(cfg.model_dir)
+        model_dir_path.mkdir(parents=True, exist_ok=True)
+
+        if models_dir.exists() or models_dir.is_symlink():
+            if models_dir.is_symlink():
+                models_dir.unlink()
+            else:
+                shutil.rmtree(models_dir)
+
+        models_dir.symlink_to(model_dir_path.resolve())
+        print(f"Created symlink: models -> {model_dir_path.resolve()}")
+        print(f"All models will be stored in: {model_dir_path.resolve()}")
+    else:
+        models_dir.mkdir(exist_ok=True)
 
 
 def load_skipped_models():
@@ -117,11 +132,80 @@ def load_skipped_models():
     return set(df["model_id"].tolist())
 
 
+def load_merged_models():
+    """Load list of model IDs that have been successfully merged from merged_models.csv."""
+    merged_file = Path(__file__).parent / "merged_models.csv"
+    if not merged_file.exists():
+        return set()
+
+    df = pd.read_csv(merged_file)
+    return set(df["model_id"].tolist())
+
+
+def save_merged_model(model_id):
+    """Save a successfully merged model to merged_models.csv."""
+    merged_file = Path(__file__).parent / "merged_models.csv"
+
+    if not merged_file.exists():
+        merged_file.write_text("model_id\n")
+
+    with merged_file.open("a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([model_id])
+
+
+def fetch_or_load_models(api, base_model_id):
+    """Fetch model list from API or load from all_models.csv for consistent ordering."""
+    model_ids = load_all_models()
+    if model_ids is None:
+        print("Fetching model list from HuggingFace API...")
+        models = api.list_models(
+            filter=f"base_model:finetune:{base_model_id}",
+            sort="downloads",
+            direction=-1,
+            gated=False,
+            expand=["downloads", "safetensors", "pipeline_tag"],
+        )
+        model_ids = [model.id for model in models]
+        save_all_models(model_ids)
+        print(f"Saved {len(model_ids)} model IDs to all_models.csv")
+        return models
+    else:
+        print(f"Loaded {len(model_ids)} model IDs from all_models.csv")
+        models = []
+        for model_id in model_ids:
+            try:
+                model_info = api.model_info(
+                    model_id, expand=["downloads", "safetensors", "pipeline_tag"]
+                )
+                models.append(model_info)
+            except Exception as e:
+                print(f"Could not fetch info for {model_id}: {e}")
+                continue
+        return models
+
+
+def load_all_models():
+    """Load list of all model IDs from all_models.csv."""
+    all_models_file = Path(__file__).parent / "all_models.csv"
+    if not all_models_file.exists():
+        return None
+
+    df = pd.read_csv(all_models_file)
+    return df["model_id"].tolist()
+
+
+def save_all_models(model_ids):
+    """Save the list of all model IDs to all_models.csv."""
+    all_models_file = Path(__file__).parent / "all_models.csv"
+
+    df = pd.DataFrame({"model_id": model_ids})
+    df.to_csv(all_models_file, index=False)
+
+
 def is_bf16(model):
     """Check if a model is bf16."""
-    return model.safetensors is not None and set(
-        model.safetensors.parameters.keys()
-    ) == {"BF16"}
+    return model.safetensors is None or "BF16" in model.safetensors.parameters.keys()
 
 
 def is_text_generation(model):
@@ -139,22 +223,26 @@ def are_nearly_equal(sd1, sd2):
     return True
 
 
-def dtypes_match(sd1, sd2):
-    """Check if two state dictionaries have the same dtypes."""
+def tensors_match(sd1, sd2):
+    """Check if two state dictionaries have matching keys, dtypes, and shapes."""
     for key in sd1.keys():
         if key not in sd2:
             return False
         if sd1[key].dtype != sd2[key].dtype:
             return False
+        if sd1[key].shape != sd2[key].shape:
+            return False
     return True
 
 
-def download(model_id, folder):
-    """Download a model from HuggingFace Hub to a fixed directory."""
-    folder_path = Path(f"models/{folder}")
+def download(model_id):
+    """Download a model from HuggingFace Hub to a model-specific directory."""
+    model_name = model_id.replace("/", "--")
+    folder_path = Path(f"models/{model_name}")
 
     if folder_path.exists():
-        shutil.rmtree(folder_path)
+        print(f"Model {model_id} already exists at {folder_path}, skipping download.")
+        return
 
     print(f"Downloading {model_id} to {folder_path}...")
     snapshot_download(
@@ -166,8 +254,24 @@ def download(model_id, folder):
     print(f"Downloaded {model_id}.")
 
 
-def evaluate(model_path, work_dir):
+def evaluate(model_id, work_dir=None):
+    """Evaluate a model and return its accuracy.
+
+    Args:
+        model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
+        work_dir: Optional work directory. If None, derives from model_id
+    """
+    if work_dir is None:
+        model_name = model_id.replace("/", "--")
+        model_path = f"models/{model_name}"
+        work_dir = Path(f"outputs/opencompass/{model_name}")
+    else:
+        model_name = Path(work_dir).parent.name
+        model_path = f"models/{model_name}"
+        work_dir = Path(work_dir)
+
     set_eval_model_symlink(model_path)
+    work_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
             "opencompass",
@@ -203,11 +307,12 @@ def get_accuracy(work_dir):
     return df["eval_model"].mean()
 
 
-def load(model_id, folder):
-    """Load a model from the specified folder. Returns None if loading fails."""
+def load(model_id):
+    """Load a model from the model directory. Returns None if loading fails."""
+    model_name = model_id.replace("/", "--")
     try:
         model = AutoModelForCausalLM.from_pretrained(
-            f"models/{folder}", device_map="cpu", trust_remote_code=True
+            f"models/{model_name}", device_map="cpu", trust_remote_code=True
         )
         return model.state_dict()
     except ImportError:
@@ -221,9 +326,9 @@ def load(model_id, folder):
         return None
 
 
-def save(model, folder):
+def save(model, model_name):
     """Save the merged model."""
-    model_path = Path(f"models/{folder}")
+    model_path = Path(f"models/{model_name}")
     model_path.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(model_path)
     print(f"Saved merged model to {model_path}")

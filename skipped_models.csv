@@ -43,3 +43,7 @@ THUMedInfo/GENIE_en_8b,not_bf16
 DongkiKim/Mol-Llama-3.1-8B-Instruct,value_error
 ICTNLP/Llama-3.1-8B-Omni,value_error
 mlx-community/Llama-3.1-8B-Instruct,not_bf16
+tokyotech-llm/Llama-3.1-Swallow-8B-v0.5,poor_performance
+zai-org/cogvlm2-llama3-caption,not_text
+watt-ai/watt-tool-8B,poor_performance
+TheFinAI/Fino1-8B,poor_performance
