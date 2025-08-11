@@ -6,56 +6,10 @@ from pathlib import Path
 import argparse
 
 
-def get_avg_acc(step_dir, model_type):
-    """Get average accuracy for a specific model type from summary CSV."""
-    model_step_dir = step_dir / model_type
-
-    if not model_step_dir.exists():
-        return None
-
-    timestamp_dir = sorted(model_step_dir.iterdir(), reverse=True)[0]
-    summary_dir = timestamp_dir / "summary"
-    csv_files = list(summary_dir.glob("*.csv"))
-
-    if not csv_files:
-        return None
-
-    df = pd.read_csv(csv_files[0])
-    df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
-    return df["eval_model"].mean()
-
-
-def load_summary_data():
-    """Load all summary CSV files and extract average accuracies."""
-    outputs_dir = Path("outputs")
-    step_data = {}
-
-    step_dirs = sorted([d for d in outputs_dir.iterdir() if d.name.startswith("step_")])
-
-    for step_dir in step_dirs:
-        step_num = int(step_dir.name.split("_")[1])
-
-        current_avg_acc = get_avg_acc(step_dir, "current")
-        merged_avg_acc = get_avg_acc(step_dir, "merged")
-        if step_num == 0:
-            merged_avg_acc = current_avg_acc
-
-        current_avg_acc = current_avg_acc or 0.0
-        merged_avg_acc = merged_avg_acc or 0.0
-
-        step_data[step_num] = {
-            "current_model": current_avg_acc,
-            "merged_model": merged_avg_acc,
-        }
-
-    return step_data
-
-
-def create_plot(step_data, num_steps=None, ylim=None):
+def create_plot(num_steps=None, ylim=None):
     """Create the accuracy progression plot."""
+    step_data = load_summary_data(num_steps)
     steps = sorted(step_data.keys())
-    if num_steps is not None:
-        steps = steps[:num_steps]
     current_accuracies = [step_data[step]["current_model"] for step in steps]
     merged_accuracies = [step_data[step]["merged_model"] for step in steps]
 
@@ -152,6 +106,57 @@ def create_plot(step_data, num_steps=None, ylim=None):
     plt.show()
 
 
+def load_summary_data(num_steps=None):
+    """Load all summary CSV files and extract average accuracies."""
+    outputs_dir = Path("outputs")
+    step_data = {}
+
+    df_log = pd.read_csv(outputs_dir / "merge_log.csv")
+    merged_models = df_log[df_log["status"] == "merged"]["model_id"].tolist()
+    print(f"Merged models: {merged_models}")
+
+    merged_model_dir = outputs_dir / "merged_model"
+    step_dirs = sorted(
+        [d for d in merged_model_dir.iterdir() if d.name.startswith("step_")]
+    )
+
+    if num_steps is not None:
+        step_dirs = step_dirs[:num_steps]
+
+    for step in range(len(step_dirs)):
+        model_name = merged_models[step].replace("/", "--")
+        current_model_dir = outputs_dir / "opencompass" / model_name
+        current_avg_acc = get_average_accuracy(current_model_dir)
+        print(f"Current model dir: {current_model_dir}")
+        print(f"Accuracy: {current_avg_acc}")
+
+        merged_model_step_dir = outputs_dir / "merged_model" / f"step_{step}"
+        merged_avg_acc = get_average_accuracy(merged_model_step_dir)
+        print(f"Merged model dir: {merged_model_step_dir}")
+        print(f"Accuracy: {merged_avg_acc}")
+
+        step_data[step] = {
+            "current_model": current_avg_acc or 0.0,
+            "merged_model": merged_avg_acc or 0.0,
+        }
+
+    return step_data
+
+
+def get_average_accuracy(model_dir):
+    """Get average accuracy from a model directory with timestamp subdirectories."""
+    if not model_dir.exists():
+        return None
+
+    timestamp_dir = next(model_dir.iterdir())
+    summary_dir = timestamp_dir / "summary"
+    csv_file = next(summary_dir.glob("*.csv"))
+
+    df = pd.read_csv(csv_file)
+    df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
+    return df["eval_model"].mean()
+
+
 def main():
     """Main function to load data and create plot."""
     parser = argparse.ArgumentParser(
@@ -172,10 +177,8 @@ def main():
         help="Set y-axis limits, e.g. --ylim 0 100",
     )
     args = parser.parse_args()
-    step_data = load_summary_data()
-    print(f"\nFound data for {len(step_data)} steps")
     ylim = tuple(args.ylim) if args.ylim is not None else None
-    create_plot(step_data, num_steps=args.num_steps, ylim=ylim)
+    create_plot(num_steps=args.num_steps, ylim=ylim)
 
 
 if __name__ == "__main__":
