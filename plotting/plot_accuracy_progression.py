@@ -100,7 +100,7 @@ def create_plot(num_steps=None, ylim=None):
             )
 
     plt.tight_layout()
-    figures_dir = Path(__file__) / "../../figures"
+    figures_dir = (Path(__file__) / "../../figures").resolve()
     figures_dir.mkdir(exist_ok=True)
     plt.savefig(figures_dir / "accuracy_progression.png", dpi=300, bbox_inches="tight")
     plt.show()
@@ -108,7 +108,7 @@ def create_plot(num_steps=None, ylim=None):
 
 def load_summary_data(num_steps=None):
     """Load all summary CSV files and extract average accuracies."""
-    outputs_dir = Path(__file__) / "../../outputs"
+    outputs_dir = (Path(__file__) / "../../outputs").resolve()
     step_data = {}
 
     df_log = pd.read_csv(outputs_dir / "merge_log.csv")
