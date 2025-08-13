@@ -29,58 +29,70 @@ def main(cfg: DictConfig):
     setup_model_directory(cfg)
 
     skipped_models = load_skipped_models()
+    merged_models = load_merged_models()
     models = fetch_or_load_models(api, base_model_id)
 
     download(base_model_id)
     base_model_name = base_model_id.replace("/", "--")
-    shutil.copytree(
-        f"models/{base_model_name}", "models/merged_model", dirs_exist_ok=True
-    )
-    current_accuracy = evaluate(base_model_id, overwrite=cfg.overwrite)
-    log_merge(base_model_id, "merged", current_accuracy, current_accuracy)
 
+    merged_model_path = Path("models/merged_model")
     base_model = AutoModelForCausalLM.from_pretrained(
         f"models/{base_model_name}", device_map="cpu", trust_remote_code=True
     )
     base_state_dict = deepcopy(base_model.state_dict())
-    merged_state_dict = deepcopy(base_model.state_dict())
+
+    resume = merged_model_path.exists()
+    if not resume:
+        shutil.copytree(f"models/{base_model_name}", merged_model_path)
+        current_accuracy = evaluate(base_model_id)
+        log_merged_model(base_model_id, current_accuracy, current_accuracy)
+        merged_state_dict = deepcopy(base_model.state_dict())
+        merging_step = 0
+        print("Starting from scratch")
+    else:
+        merged_model = AutoModelForCausalLM.from_pretrained(
+            merged_model_path, device_map="cpu", trust_remote_code=True
+        )
+        merged_state_dict = deepcopy(merged_model.state_dict())
+        base_model.load_state_dict(merged_state_dict)
+        merging_step = len([m for m in merged_models if m != base_model_id])
+        print(f"Resuming from merging step {merging_step}")
 
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
 
-    merging_step = 0
     for model in models:
-        if model.id in skipped_models:
-            print(f"Skipping {model.id} (previously skipped)")
+        if resume and (model.id in merged_models or model.id in skipped_models):
+            print(f"Skipping {model.id} (already processed)")
             continue
 
         if not is_bf16(model):
-            log_merge(model.id, "not_bf16")
+            log_skipped_model(model.id, "not_bf16")
             continue
 
         if not is_text_generation(model):
-            log_merge(model.id, "not_text")
+            log_skipped_model(model.id, "not_text")
             continue
 
         download(model.id)
         current_model_state_dict = load(model.id)
 
         if current_model_state_dict is None:
-            log_merge(model.id, "load_error")
+            log_skipped_model(model.id, "load_error")
             continue
 
         if not tensors_match(base_state_dict, current_model_state_dict):
-            log_merge(model.id, "dtypes_mismatch")
+            log_skipped_model(model.id, "dtypes_mismatch")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
-            log_merge(model.id, "nearly_equal")
+            log_skipped_model(model.id, "nearly_equal")
             continue
 
-        current_accuracy = evaluate(model.id, overwrite=cfg.overwrite)
+        current_accuracy = evaluate(model.id)
 
         if current_accuracy < 50.0:
-            log_merge(model.id, "poor_performance", current_accuracy)
+            log_skipped_model(model.id, "poor_performance")
             continue
 
         merging_step += 1
@@ -91,9 +103,8 @@ def main(cfg: DictConfig):
         merged_accuracy = evaluate(
             "merged_model",
             f"outputs/opencompass/merged_model/step_{merging_step}",
-            overwrite=cfg.overwrite,
         )
-        log_merge(model.id, "merged", current_accuracy, merged_accuracy)
+        log_merged_model(model.id, current_accuracy, merged_accuracy)
 
         if merging_step > cfg.model_limit:
             break
@@ -131,6 +142,16 @@ def load_skipped_models():
 
     df = pd.read_csv(skipped_file)
     return set(df["model_id"].tolist())
+
+
+def load_merged_models():
+    """Load list of model IDs that have been successfully merged from merge_log.csv."""
+    log_file = Path(__file__).parent / "outputs/merge_log.csv"
+    if not log_file.exists():
+        return []
+
+    df = pd.read_csv(log_file)
+    return df["model_id"].tolist()
 
 
 def fetch_or_load_models(api, base_model_id):
@@ -233,13 +254,12 @@ def download(model_id):
     print(f"Downloaded {model_id}.")
 
 
-def evaluate(model_id, work_dir=None, overwrite=False):
+def evaluate(model_id, work_dir=None):
     """Evaluate a model and return its accuracy.
 
     Args:
         model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
         work_dir: Optional work directory. If None, derives from model_id
-        overwrite: If True, overwrite any existing results in work_dir. If False, reuse if present.
     """
     if work_dir is None:
         model_name = model_id.replace("/", "--")
@@ -250,11 +270,8 @@ def evaluate(model_id, work_dir=None, overwrite=False):
         model_path = f"models/{model_name}"
         work_dir = Path(work_dir)
 
-    if not overwrite and work_dir.exists():
+    if work_dir.exists():
         return get_accuracy(work_dir)
-
-    if overwrite and work_dir.exists():
-        shutil.rmtree(work_dir)
 
     set_eval_model_symlink(model_path)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -302,13 +319,13 @@ def load(model_id):
         )
         return model.state_dict()
     except ImportError:
-        log_merge(model_id, "import_error")
+        log_skipped_model(model_id, "import_error")
         return None
     except ValueError:
-        log_merge(model_id, "value_error")
+        log_skipped_model(model_id, "value_error")
         return None
-    except RuntimeError as e:
-        log_merge(model_id, "runtime_error", str(e))
+    except RuntimeError:
+        log_skipped_model(model_id, "runtime_error")
         return None
 
 
@@ -320,24 +337,20 @@ def save(model, model_name):
     print(f"Saved merged model to {model_path}")
 
 
-def log_merge(model_id, status, current_accuracy=None, merged_accuracy=None):
+def log_merged_model(model_id, current_accuracy, merged_accuracy):
+    """Log a successful merge to the merge log."""
     log_file = Path(__file__).parent / "outputs/merge_log.csv"
     log_file.parent.mkdir(exist_ok=True)
     if not log_file.exists():
         with open(log_file, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(
-                ["model_id", "status", "current_accuracy", "merged_accuracy"]
-            )
+            writer.writerow(["model_id", "current_accuracy", "merged_accuracy"])
     with open(log_file, "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow([model_id, status, current_accuracy, merged_accuracy])
-
-    if status != "merged":
-        save_skipped_model(model_id, status)
+        writer.writerow([model_id, current_accuracy, merged_accuracy])
 
 
-def save_skipped_model(model_id, reason):
+def log_skipped_model(model_id, reason):
     """Save a skipped model to skipped_models.csv."""
     skipped_file = Path(__file__).parent / "skipped_models.csv"
 
