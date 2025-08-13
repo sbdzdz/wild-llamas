@@ -64,8 +64,12 @@ def main(cfg: DictConfig):
     merger.update(merged_state_dict)
 
     for model in models:
-        if resume and (model.id in merged_models or model.id in skipped_models):
-            print(f"Skipping {model.id} (already processed)")
+        if model.id in skipped_models:
+            print(f"Skipping {model.id} (previously skipped)")
+            continue
+
+        if resume and model.id in merged_models:
+            print(f"Skipping {model.id} (already merged)")
             continue
 
         if not is_bf16(model):
