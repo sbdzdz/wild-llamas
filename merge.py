@@ -153,6 +153,14 @@ class WeightAveragingRunning:
         self.step_count += 1
         return self.current_average
 
+    @property
+    def step_count(self):
+        return self._step_count
+
+    @step_count.setter
+    def step_count(self, value):
+        self._step_count = value
+
 
 class TaskArithmetic(BaseTaskVectorMerge):
     """Task-Arithmetic merging technique."""

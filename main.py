@@ -32,18 +32,18 @@ def main(cfg: DictConfig):
     merged_models = load_merged_models()
     models = fetch_or_load_models(api, base_model_id)
 
-    download(base_model_id)
-    base_model_name = base_model_id.replace("/", "--")
+    base_model_path = download(base_model_id)
+
+    base_model = AutoModelForCausalLM.from_pretrained(
+        base_model_path, device_map="cpu", trust_remote_code=True
+    )
+    base_state_dict = base_model.state_dict()
 
     merged_model_path = Path("models/merged_model")
-    base_model = AutoModelForCausalLM.from_pretrained(
-        f"models/{base_model_name}", device_map="cpu", trust_remote_code=True
-    )
-    base_state_dict = deepcopy(base_model.state_dict())
 
     resume = merged_model_path.exists()
     if not resume:
-        shutil.copytree(f"models/{base_model_name}", merged_model_path)
+        shutil.copytree(base_model_path, merged_model_path)
         current_accuracy = evaluate(
             base_model_id, "outputs/opencompass/merged_model/step_0"
         )
@@ -55,15 +55,19 @@ def main(cfg: DictConfig):
         merged_model = AutoModelForCausalLM.from_pretrained(
             merged_model_path, device_map="cpu", trust_remote_code=True
         )
-        merged_state_dict = deepcopy(merged_model.state_dict())
+        merged_state_dict = merged_model.state_dict()
         base_model.load_state_dict(merged_state_dict)
         merging_step = len([m for m in merged_models if m != base_model_id])
         print(f"Resuming from merging step {merging_step}")
 
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
+    merger.step_count = merging_step + 1
 
     for model in models:
+        gc.collect()
+        torch.cuda.empty_cache()
+
         if model.id in skipped_models:
             print(f"Skipping {model.id} (previously skipped)")
             continue
@@ -114,9 +118,6 @@ def main(cfg: DictConfig):
 
         if merging_step > cfg.model_limit:
             break
-
-        gc.collect()
-        torch.cuda.empty_cache()
 
 
 def setup_model_directory(cfg: DictConfig):
@@ -244,20 +245,21 @@ def tensors_match(sd1, sd2):
 def download(model_id):
     """Download a model from HuggingFace Hub to a model-specific directory."""
     model_name = model_id.replace("/", "--")
-    folder_path = Path(f"models/{model_name}")
+    model_path = Path(f"models/{model_name}")
 
-    if folder_path.exists():
-        print(f"Model {model_id} already exists at {folder_path}, skipping download.")
+    if model_path.exists():
+        print(f"Model {model_id} already exists at {model_path}, skipping download.")
         return
 
-    print(f"Downloading {model_id} to {folder_path}...")
+    print(f"Downloading {model_id} to {model_path}...")
     snapshot_download(
         repo_id=model_id,
-        local_dir=str(folder_path),
+        local_dir=str(model_path),
         max_workers=1,
         local_dir_use_symlinks=False,
     )
     print(f"Downloaded {model_id}.")
+    return model_path
 
 
 def evaluate(model_id, work_dir=None):
