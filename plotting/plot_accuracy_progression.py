@@ -100,7 +100,7 @@ def create_plot(num_steps=None, ylim=None):
             )
 
     plt.tight_layout()
-    figures_dir = Path("figures")
+    figures_dir = Path(__file__) / "../../figures"
     figures_dir.mkdir(exist_ok=True)
     plt.savefig(figures_dir / "accuracy_progression.png", dpi=300, bbox_inches="tight")
     plt.show()
@@ -108,13 +108,13 @@ def create_plot(num_steps=None, ylim=None):
 
 def load_summary_data(num_steps=None):
     """Load all summary CSV files and extract average accuracies."""
-    outputs_dir = Path("outputs")
+    outputs_dir = Path(__file__) / "../../outputs"
     step_data = {}
 
     df_log = pd.read_csv(outputs_dir / "merge_log.csv")
-    merged_models = df_log[df_log["status"] == "merged"]["model_id"].tolist()
+    merged_models = df_log["model_id"].tolist()
 
-    merged_model_dir = outputs_dir / "merged_model"
+    merged_model_dir = outputs_dir / "opencompass/merged_model"
     step_dirs = sorted(
         [d for d in merged_model_dir.iterdir() if d.name.startswith("step_")]
     )
@@ -126,10 +126,10 @@ def load_summary_data(num_steps=None):
 
     for step in range(len(step_dirs)):
         model_name = merged_models[step].replace("/", "--")
-        current_model_dir = outputs_dir / "opencompass" / model_name
+        current_model_dir = outputs_dir / f"opencompass/{model_name}"
         current_avg_acc = get_average_accuracy(current_model_dir)
 
-        merged_model_step_dir = outputs_dir / "merged_model" / f"step_{step}"
+        merged_model_step_dir = outputs_dir / f"opencompass/merged_model/step_{step}"
         merged_avg_acc = get_average_accuracy(merged_model_step_dir)
 
         step_data[step] = {
@@ -140,15 +140,16 @@ def load_summary_data(num_steps=None):
     return step_data
 
 
-def get_average_accuracy(model_dir):
+def get_average_accuracy(work_dir):
     """Get average accuracy from a model directory with timestamp subdirectories."""
-    if not model_dir.exists():
-        return None
-
-    timestamp_dir = next(model_dir.iterdir())
-    summary_dir = timestamp_dir / "summary"
+    step_dir = Path(work_dir)
+    subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
+    if len(subdirs) != 1:
+        raise RuntimeError(
+            f"Expected exactly one directory in {work_dir}, found {len(subdirs)}"
+        )
+    summary_dir = subdirs[0] / "summary"
     csv_file = next(summary_dir.glob("*.csv"))
-
     df = pd.read_csv(csv_file)
     df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
     return df["eval_model"].mean()
