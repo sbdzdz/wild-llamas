@@ -93,7 +93,7 @@ def create_plot(num_steps=None, ylim=None):
                 f"{merged:.1f}",
                 (step, merged),
                 textcoords="offset points",
-                xytext=(-5, 10),
+                xytext=(-5, 8),
                 ha="center",
                 fontsize=8,
                 color=merged_color,
@@ -113,7 +113,6 @@ def load_summary_data(num_steps=None):
 
     df_log = pd.read_csv(outputs_dir / "merge_log.csv")
     merged_models = df_log[df_log["status"] == "merged"]["model_id"].tolist()
-    print(f"Merged models: {merged_models}")
 
     merged_model_dir = outputs_dir / "merged_model"
     step_dirs = sorted(
@@ -123,17 +122,15 @@ def load_summary_data(num_steps=None):
     if num_steps is not None:
         step_dirs = step_dirs[:num_steps]
 
+    print(f"Found {len(step_dirs)} steps")
+
     for step in range(len(step_dirs)):
         model_name = merged_models[step].replace("/", "--")
         current_model_dir = outputs_dir / "opencompass" / model_name
         current_avg_acc = get_average_accuracy(current_model_dir)
-        print(f"Current model dir: {current_model_dir}")
-        print(f"Accuracy: {current_avg_acc}")
 
         merged_model_step_dir = outputs_dir / "merged_model" / f"step_{step}"
         merged_avg_acc = get_average_accuracy(merged_model_step_dir)
-        print(f"Merged model dir: {merged_model_step_dir}")
-        print(f"Accuracy: {merged_avg_acc}")
 
         step_data[step] = {
             "current_model": current_avg_acc or 0.0,
