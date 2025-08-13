@@ -1,7 +1,6 @@
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
 model_limit: 50
 model_dir: null
-overwrite: false
 
 hydra:
   run:
