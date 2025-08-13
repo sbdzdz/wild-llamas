@@ -276,7 +276,7 @@ def evaluate(model_id, work_dir=None):
 
     if work_dir.exists():
         print(f"Using existing evaluation results at {work_dir}")
-        return get_accuracy(work_dir)
+        return get_average_accuracy(work_dir)
 
     set_eval_model_symlink(model_path)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -289,7 +289,7 @@ def evaluate(model_id, work_dir=None):
         ],
         check=True,
     )
-    return get_accuracy(work_dir)
+    return get_average_accuracy(work_dir)
 
 
 def set_eval_model_symlink(target):
@@ -300,7 +300,7 @@ def set_eval_model_symlink(target):
     symlink_path.symlink_to(target_abs)
 
 
-def get_accuracy(work_dir):
+def get_average_accuracy(work_dir):
     """Get the average accuracy from evaluation results."""
     step_dir = Path(work_dir)
     subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
@@ -331,6 +331,9 @@ def load(model_id):
         return None
     except RuntimeError:
         log_skipped_model(model_id, "runtime_error")
+        return None
+    except OSError:
+        log_skipped_model(model_id, "os_error")
         return None
 
 
