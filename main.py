@@ -44,7 +44,9 @@ def main(cfg: DictConfig):
     resume = merged_model_path.exists()
     if not resume:
         shutil.copytree(f"models/{base_model_name}", merged_model_path)
-        current_accuracy = evaluate(base_model_id)
+        current_accuracy = evaluate(
+            base_model_id, "outputs/opencompass/merged_model/step_0"
+        )
         log_merged_model(base_model_id, current_accuracy, current_accuracy)
         merged_state_dict = deepcopy(base_model.state_dict())
         merging_step = 0
@@ -261,13 +263,11 @@ def evaluate(model_id, work_dir=None):
         model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
         work_dir: Optional work directory. If None, derives from model_id
     """
+    model_name = model_id.replace("/", "--")
+    model_path = f"models/{model_name}"
     if work_dir is None:
-        model_name = model_id.replace("/", "--")
-        model_path = f"models/{model_name}"
         work_dir = Path(f"outputs/opencompass/{model_name}")
     else:
-        model_name = Path(work_dir).parent.name
-        model_path = f"models/{model_name}"
         work_dir = Path(work_dir)
 
     if work_dir.exists():
