@@ -275,6 +275,7 @@ def evaluate(model_id, work_dir=None):
         work_dir = Path(work_dir)
 
     if work_dir.exists():
+        print(f"Using existing evaluation results at {work_dir}")
         return get_accuracy(work_dir)
 
     set_eval_model_symlink(model_path)
