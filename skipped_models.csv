@@ -52,3 +52,12 @@ IAAR-Shanghai/xVerify-8B-I,poor_performance
 aisingapore/Llama-SEA-LION-v3-8B,poor_performance
 barc0/Llama-3.1-ARC-Potpourri-Transduction-8B,poor_performance
 general-preference/GPM-Llama-3.1-8B,poor_performance
+PORTULAN/gervasio-8b-portuguese-ptpt-decoder,os_error
+PORTULAN/gervasio-8b-portuguese-ptpt-decoder,load_error
+thu-ml/STAIR-Llama-3.1-8B-DPO-3,dtypes_mismatch
+thu-ml/STAIR-Llama-3.1-8B-SFT,dtypes_mismatch
+dslighfdsl/Llama-3.1-8B-Instruct-SFT-CoT-short,poor_performance
+empirischtech/Llama-3.1-8B-Instruct-MedQA,dtypes_mismatch
+syvai/o7,dtypes_mismatch
+andysmith66/Meta-Llama-3.1-8B-Instruct,nearly_equal
+WillHeld/DiVA-llama-3-v0-8b,not_bf16
