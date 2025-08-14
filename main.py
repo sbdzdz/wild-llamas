@@ -101,7 +101,7 @@ def main(cfg: DictConfig):
 
         current_accuracy = evaluate(model.id)
 
-        if current_accuracy < 50.0:
+        if current_accuracy < 60.0:
             log_skipped_model(model.id, "poor_performance")
             continue
 
@@ -249,7 +249,7 @@ def download(model_id):
 
     if model_path.exists():
         print(f"Model {model_id} already exists at {model_path}, skipping download.")
-        return
+        return model_path
 
     print(f"Downloading {model_id} to {model_path}...")
     snapshot_download(
