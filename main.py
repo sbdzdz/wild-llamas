@@ -263,7 +263,7 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, work_dir=None, num_gpus=1):
+def evaluate(model_id, out_dir=None, num_gpus=1):
     """Evaluate a model and return its accuracy.
 
     Args:
@@ -273,17 +273,20 @@ def evaluate(model_id, work_dir=None, num_gpus=1):
     """
     model_name = model_id.replace("/", "--")
     model_path = f"models/{model_name}"
-    if work_dir is None:
-        work_dir = Path(f"outputs/opencompass/{model_name}")
+    if out_dir is None:
+        out_dir = Path(f"outputs/opencompass/{model_name}")
     else:
-        work_dir = Path(work_dir)
+        out_dir = Path(out_dir)
 
-    if work_dir.exists():
-        print(f"Using existing evaluation results at {work_dir}")
-        return get_average_accuracy(work_dir)
+    if out_dir.exists():
+        print(f"Using existing evaluation results at {out_dir}")
+        subdirs = [d for d in out_dir.iterdir() if d.is_dir()]
+        assert len(subdirs) == 1, f"Expected exactly one directory in {out_dir}"
+        timestamp_dir = subdirs[0]
+        return get_accuracy(timestamp_dir)
 
     set_eval_model_symlink(model_path)
-    work_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     cuda_devices = ",".join(str(i) for i in range(num_gpus))
 
@@ -293,13 +296,14 @@ def evaluate(model_id, work_dir=None, num_gpus=1):
             "opencompass",
             "eval_llama.py",
             "--work-dir",
-            work_dir,
+            out_dir,
             "--max-num-worker",
             str(num_gpus),
         ],
         check=True,
     )
-    return get_average_accuracy(work_dir)
+    timestamp_dir = next(d for d in out_dir.iterdir() if d.is_dir())
+    return get_accuracy(timestamp_dir)
 
 
 def set_eval_model_symlink(target):
@@ -310,15 +314,14 @@ def set_eval_model_symlink(target):
     symlink_path.symlink_to(target_abs)
 
 
-def get_average_accuracy(work_dir):
-    """Get the average accuracy from evaluation results."""
-    step_dir = Path(work_dir)
-    subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
-    if len(subdirs) != 1:
-        raise RuntimeError(
-            f"Expected exactly one directory in {work_dir}, found {len(subdirs)}"
-        )
-    summary_dir = subdirs[0] / "summary"
+def get_accuracy(timestamp_dir):
+    """Get the average accuracy from evaluation results.
+
+    Args:
+        timestamp_dir: The timestamp directory containing evaluation results
+    """
+    timestamp_dir = Path(timestamp_dir)
+    summary_dir = timestamp_dir / "summary"
     csv_file = next(summary_dir.glob("*.csv"))
     df = pd.read_csv(csv_file)
     df["eval_model"] = pd.to_numeric(df["eval_model"].replace("-", 0), errors="coerce")
