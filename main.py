@@ -289,7 +289,6 @@ def evaluate(model_id, work_dir=None, num_gpus=1):
 
     subprocess.run(
         [
-            "env",
             f"CUDA_VISIBLE_DEVICES={cuda_devices}",
             "opencompass",
             "eval_llama.py",
