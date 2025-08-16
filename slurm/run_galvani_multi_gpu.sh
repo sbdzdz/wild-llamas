@@ -4,7 +4,7 @@
 #SBATCH --nodes=1                                                                         # Ensure that all cores are on one machine
 #SBATCH --partition=a100-galvani                                                          # Partition to use
 #SBATCH --time=3-00:00                                                                    # Runtime in D-HH:MM
-#SBATCH --gres=gpu:4                                                                      # Request 1 GPU
+#SBATCH --gres=gpu:8                                                                      # Request 1 GPU
 #SBATCH --mem=350G                                                                        # Memory pool for all cores (see also --mem-per-cpu)
 #SBATCH --output=/mnt/lustre/home/bethge/dziadzio08/wild-llamas/outputs/slurm/%j.out      # File to which STDOUT will be written - make sure this is not on $HOME
 #SBATCH --error=/mnt/lustre/home/bethge/dziadzio08/wild-llamas/outputs/slurm/%j.err       # File to which STDERR will be written - make sure this is not on $HOME
@@ -20,4 +20,4 @@ source $HOME/.bashrc
 source $HOME/wild-llamas/.venv/bin/activate
 
 additional_params="$@"
-python main.py model_dir=/mnt/lustre/work/bethge/dziadzio08/wild-llamas/models num_gpus=4 $additional_params
+python main.py model_dir=/mnt/lustre/work/bethge/dziadzio08/wild-llamas/models num_gpus=8 $additional_params
