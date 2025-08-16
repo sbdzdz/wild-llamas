@@ -4,19 +4,20 @@ Find finetunes for the base model on HuggingFace, download them, evaluate each o
 and incrementally merge those that pass checks into a running merged model.
 """
 
+import csv
 import gc
-import subprocess
+import os
 import shutil
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
 import hydra
+import pandas as pd
 import torch
 from huggingface_hub import HfApi, snapshot_download
 from omegaconf import DictConfig
 from transformers import AutoModelForCausalLM
-import pandas as pd
-import csv
 
 from merge import create_merge_instance
 
