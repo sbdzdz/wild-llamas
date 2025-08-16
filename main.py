@@ -263,7 +263,7 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, out_dir=None, num_gpus=1):
+def evaluate(model_id, output_dir=None, num_gpus=1):
     """Evaluate a model and return its accuracy.
 
     Args:
@@ -273,36 +273,36 @@ def evaluate(model_id, out_dir=None, num_gpus=1):
     """
     model_name = model_id.replace("/", "--")
     model_path = f"models/{model_name}"
-    if out_dir is None:
-        out_dir = Path(f"outputs/opencompass/{model_name}")
+    if output_dir is None:
+        output_dir = Path(f"outputs/opencompass/{model_name}")
     else:
-        out_dir = Path(out_dir)
+        output_dir = Path(output_dir)
 
-    if out_dir.exists():
-        print(f"Using existing evaluation results at {out_dir}")
-        subdirs = [d for d in out_dir.iterdir() if d.is_dir()]
-        assert len(subdirs) == 1, f"Expected exactly one directory in {out_dir}"
+    if output_dir.exists():
+        print(f"Using existing evaluation results at {output_dir}")
+        subdirs = [d for d in output_dir.iterdir() if d.is_dir()]
+        assert len(subdirs) == 1, f"Expected exactly one directory in {output_dir}"
         timestamp_dir = subdirs[0]
         return get_accuracy(timestamp_dir)
 
     set_eval_model_symlink(model_path)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     cuda_devices = ",".join(str(i) for i in range(num_gpus))
 
     subprocess.run(
         [
-            f"CUDA_VISIBLE_DEVICES={cuda_devices}",
             "opencompass",
             "eval_llama.py",
             "--work-dir",
-            out_dir,
+            output_dir,
             "--max-num-worker",
             str(num_gpus),
         ],
+        env={"CUDA_VISIBLE_DEVICES": cuda_devices, **os.environ},
         check=True,
     )
-    timestamp_dir = next(d for d in out_dir.iterdir() if d.is_dir())
+    timestamp_dir = next(d for d in output_dir.iterdir() if d.is_dir())
     return get_accuracy(timestamp_dir)
 
 
