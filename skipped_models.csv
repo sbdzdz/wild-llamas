@@ -93,3 +93,7 @@ emilietto1/llama3_second,poor_performance
 JamieOgundiran/Ogun-Llama3-8B,dtypes_mismatch
 DISLab/SummLlama3.1-8B,not_text
 nenad1002/quantum-research-bot-v1.0,dtypes_mismatch
+TsinghuaC3I/Llama-3.1-8B-UltraMedical,poor_performance
+lordChipotle/Llama3GRPOReasoning,not_text
+FBogaerts/Meta-Llama-3.1-8B-Instruct-Finetuned,not_bf16
+mlx-community/Meta-Llama-3.1-8B-Instruct-abliterated-Q4-MLX,not_bf16
