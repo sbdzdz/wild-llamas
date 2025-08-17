@@ -6,16 +6,59 @@ from pathlib import Path
 import argparse
 
 
-def create_plot(num_steps=None, ylim=None, individual=False):
+def plot_accuracy_progression(ylim=None, individual=False):
     """Create the accuracy progression plot."""
     if individual:
-        create_individual_plot(num_steps, ylim)
-        return
+        create_individual_plot(ylim)
+    else:
+        create_aggregate_plot(ylim)
 
-    # Load data as DataFrame and compute averages using pandas
-    df = load_summary_data(num_steps, return_dataframe=True)
 
-    # Compute averages across all subsets for each step using pandas groupby
+def create_individual_plot(ylim=None):
+    """Create individual plots for each MMLU subset as separate files."""
+    df = load_summary_data()
+    subsets = sorted(df["dataset"].unique())
+
+    figures_dir = (Path(__file__) / "../../figures").resolve()
+    figures_dir.mkdir(exist_ok=True)
+
+    print(f"Creating individual plots for {len(subsets)} MMLU subsets...")
+
+    for subset in subsets:
+        subset_df = df[df["dataset"] == subset].sort_values("step")
+        steps = subset_df["step"].tolist()
+        current_accuracies = subset_df["eval_model_current"].tolist()
+        merged_accuracies = subset_df["eval_model_merged"].tolist()
+
+        plot_accuracy(
+            steps,
+            current_accuracies,
+            merged_accuracies,
+            ylim=ylim,
+            show_annotations=True,
+        )
+
+        plt.title(
+            f"LLaMA-3.1-8B-Instruct Accuracy Across Merging Steps: {format_subset_name(subset)}",
+            fontsize=14,
+            fontweight="bold",
+        )
+
+        plt.tight_layout()
+
+        filename = create_filename_from_subset(subset)
+        plt.savefig(figures_dir / filename, dpi=300, bbox_inches="tight")
+        plt.close()
+
+        print(f"Saved: {filename}")
+
+    print(f"All individual plots saved to {figures_dir}")
+
+
+def create_aggregate_plot(ylim=None):
+    """Create aggregate plot averaging across all MMLU subsets."""
+    df = load_summary_data()
+
     avg_df = (
         df.groupby("step")
         .agg({"eval_model_current": "mean", "eval_model_merged": "mean"})
@@ -26,7 +69,7 @@ def create_plot(num_steps=None, ylim=None, individual=False):
     current_accuracies = avg_df["eval_model_current"].tolist()
     merged_accuracies = avg_df["eval_model_merged"].tolist()
 
-    plot_accuracy_data(steps, current_accuracies, merged_accuracies, ylim=ylim)
+    plot_accuracy(steps, current_accuracies, merged_accuracies, ylim=ylim)
 
     plt.title(
         "LLaMA-3.1-8B-Instruct Accuracy Across Merging Steps",
@@ -39,50 +82,6 @@ def create_plot(num_steps=None, ylim=None, individual=False):
     figures_dir.mkdir(exist_ok=True)
     plt.savefig(figures_dir / "accuracy_progression.png", dpi=300, bbox_inches="tight")
     plt.show()
-
-
-def create_individual_plot(num_steps=None, ylim=None):
-    """Create individual plots for each MMLU subset as separate files."""
-    subset_data = load_summary_data(num_steps)
-    subsets = sorted(subset_data.keys())
-
-    figures_dir = (Path(__file__) / "../../figures").resolve()
-    figures_dir.mkdir(exist_ok=True)
-
-    print(f"Creating individual plots for {len(subsets)} MMLU subsets...")
-
-    for subset in subsets:
-        data = subset_data[subset]
-        steps = data["steps"]
-        current_accuracies = data["current_model"]
-        merged_accuracies = data["merged_model"]
-
-        # Create individual plot with identical formatting to averaged plot
-        plot_accuracy_data(
-            steps,
-            current_accuracies,
-            merged_accuracies,
-            ylim=ylim,
-            show_annotations=True,
-        )
-
-        # Add title specific to this subset
-        plt.title(
-            f"LLaMA-3.1-8B-Instruct Accuracy Across Merging Steps: {format_subset_name(subset)}",
-            fontsize=14,
-            fontweight="bold",
-        )
-
-        plt.tight_layout()
-
-        # Save to individual file
-        filename = create_filename_from_subset(subset)
-        plt.savefig(figures_dir / filename, dpi=300, bbox_inches="tight")
-        plt.close()  # Close the figure to free memory
-
-        print(f"Saved: {filename}")
-
-    print(f"All individual plots saved to {figures_dir}")
 
 
 def format_subset_name(dataset_name):
@@ -98,7 +97,7 @@ def create_filename_from_subset(dataset_name):
     return f"accuracy_progression_{name}.png"
 
 
-def plot_accuracy_data(
+def plot_accuracy(
     steps,
     current_accuracies,
     merged_accuracies,
@@ -122,7 +121,6 @@ def plot_accuracy_data(
     merged_color = cmap(2)
     marker_size = 50
 
-    # Base model
     plt.scatter(
         [steps[0]],
         [merged_accuracies[0]],
@@ -133,7 +131,6 @@ def plot_accuracy_data(
         edgecolor="none",
     )
 
-    # Current model
     plt.scatter(
         steps[1:],
         current_accuracies[1:],
@@ -144,7 +141,6 @@ def plot_accuracy_data(
         edgecolor="none",
     )
 
-    # Merged model
     plt.plot(
         steps,
         merged_accuracies,
@@ -170,41 +166,31 @@ def plot_accuracy_data(
     plt.legend(fontsize=11)
     plt.grid(axis="x", visible=False)
     plt.grid(axis="y", alpha=0.3)
-    plt.xticks(steps)
+    plt.xticks()
 
     if ylim is not None:
         plt.ylim(ylim)
 
-    # Add annotations if requested
     if show_annotations:
-        for i, (step, current, merged) in enumerate(
-            zip(steps, current_accuracies, merged_accuracies)
-        ):
-            if i == 0:
+        annotation_step = max(1, len(steps) // 10) if len(steps) > 20 else 1
+
+        for i, (step, merged) in enumerate(zip(steps, merged_accuracies)):
+            if i == 0 or i % annotation_step == 0:
+                is_base = i == 0
                 plt.annotate(
                     f"{merged:.1f}",
                     (step, merged),
                     textcoords="offset points",
-                    xytext=(-10, -15),
+                    xytext=(-10, -15) if is_base else (-5, 8),
                     ha="center",
                     fontsize=8,
-                    color=base_color,
-                    fontweight="bold",
-                )
-            else:
-                plt.annotate(
-                    f"{merged:.1f}",
-                    (step, merged),
-                    textcoords="offset points",
-                    xytext=(-5, 8),
-                    ha="center",
-                    fontsize=8,
-                    color=merged_color,
+                    color=base_color if is_base else merged_color,
+                    fontweight="bold" if is_base else "normal",
                 )
 
 
-def load_summary_data(num_steps=None, return_dataframe=False):
-    """Load all summary CSV files and extract accuracies for each MMLU subset using pandas operations."""
+def load_summary_data():
+    """Load all summary CSV files and extract accuracies for each MMLU subset."""
     outputs_dir = (Path(__file__) / "../../outputs").resolve()
 
     df_log = pd.read_csv(outputs_dir / "merge_log.csv")
@@ -215,26 +201,22 @@ def load_summary_data(num_steps=None, return_dataframe=False):
         [d for d in merged_model_dir.iterdir() if d.name.startswith("step_")]
     )
 
-    if num_steps is not None:
-        step_dirs = step_dirs[:num_steps]
+    num_available = min(len(step_dirs), len(merged_models))
+    step_dirs = step_dirs[:num_available]
+    merged_models = merged_models[:num_available]
 
-    min_length = min(len(step_dirs), len(merged_models))
-    step_dirs = step_dirs[:min_length]
-    merged_models = merged_models[:min_length]
-
-    print(f"Found {len(step_dirs)} steps")
+    print(f"Found {num_available} steps")
 
     all_data = []
+    for step, model_id in enumerate(merged_models):
+        model_name = model_id.replace("/", "--")
+        current_df = get_individual_accuracies(
+            outputs_dir / f"opencompass/{model_name}"
+        )
+        merged_df = get_individual_accuracies(
+            outputs_dir / f"opencompass/merged_model/step_{step}"
+        )
 
-    for step in range(len(step_dirs)):
-        model_name = merged_models[step].replace("/", "--")
-        current_model_dir = outputs_dir / f"opencompass/{model_name}"
-        current_df = get_individual_accuracies(current_model_dir)
-
-        merged_model_step_dir = outputs_dir / f"opencompass/merged_model/step_{step}"
-        merged_df = get_individual_accuracies(merged_model_step_dir)
-
-        # Merge current and merged dataframes on dataset
         step_df = pd.merge(
             current_df[["dataset", "eval_model"]],
             merged_df[["dataset", "eval_model"]],
@@ -244,23 +226,7 @@ def load_summary_data(num_steps=None, return_dataframe=False):
         step_df["step"] = step
         all_data.append(step_df)
 
-    # Combine all steps into a single DataFrame
-    combined_df = pd.concat(all_data, ignore_index=True)
-
-    if return_dataframe:
-        return combined_df
-
-    # Convert to the expected nested dictionary format for backward compatibility
-    subset_data = {}
-    for dataset in combined_df["dataset"].unique():
-        dataset_df = combined_df[combined_df["dataset"] == dataset].sort_values("step")
-        subset_data[dataset] = {
-            "steps": dataset_df["step"].tolist(),
-            "current_model": dataset_df["eval_model_current"].tolist(),
-            "merged_model": dataset_df["eval_model_merged"].tolist(),
-        }
-
-    return subset_data
+    return pd.concat(all_data, ignore_index=True)
 
 
 def get_individual_accuracies(work_dir):
@@ -283,12 +249,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plot accuracy progression across model merging steps."
     )
-    parser.add_argument(
-        "--num_steps",
-        type=int,
-        default=None,
-        help="Number of steps to plot (default: all)",
-    )
+
     parser.add_argument(
         "--ylim",
         nargs=2,
@@ -304,7 +265,7 @@ def main():
     )
     args = parser.parse_args()
     ylim = tuple(args.ylim) if args.ylim is not None else None
-    create_plot(num_steps=args.num_steps, ylim=ylim, individual=args.individual)
+    plot_accuracy_progression(ylim=ylim, individual=args.individual)
 
 
 if __name__ == "__main__":
