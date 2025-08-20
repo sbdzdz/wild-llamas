@@ -349,6 +349,9 @@ def load(model_id):
     except OSError:
         log_skipped_model(model_id, "os_error")
         return None
+    except Exception as e:
+        log_skipped_model(model_id, f"unknown_error: {e}")
+        return None
 
 
 def save(model, model_name):
