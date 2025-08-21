@@ -85,10 +85,15 @@ def main(cfg: DictConfig):
             log_skipped_model(model.id, "not_text")
             continue
 
-        download(model.id)
-        current_model_state_dict = load(model.id)
+        try:
+            download(model.id)
+        except Exception:
+            log_skipped_model(model.id, "download_error")
+            continue
 
-        if current_model_state_dict is None:
+        try:
+            current_model_state_dict = load(model.id)
+        except Exception:
             log_skipped_model(model.id, "load_error")
             continue
 
@@ -260,7 +265,6 @@ def download(model_id):
         max_workers=1,
         local_dir_use_symlinks=False,
     )
-    print(f"Downloaded {model_id}.")
     return model_path
 
 
@@ -332,26 +336,10 @@ def get_accuracy(timestamp_dir):
 def load(model_id):
     """Load a model from the model directory. Returns None if loading fails."""
     model_name = model_id.replace("/", "--")
-    try:
-        model = AutoModelForCausalLM.from_pretrained(
-            f"models/{model_name}", device_map="cpu", trust_remote_code=True
-        )
-        return model.state_dict()
-    except ImportError:
-        log_skipped_model(model_id, "import_error")
-        return None
-    except ValueError:
-        log_skipped_model(model_id, "value_error")
-        return None
-    except RuntimeError:
-        log_skipped_model(model_id, "runtime_error")
-        return None
-    except OSError:
-        log_skipped_model(model_id, "os_error")
-        return None
-    except Exception as e:
-        log_skipped_model(model_id, f"unknown_error: {e}")
-        return None
+    model = AutoModelForCausalLM.from_pretrained(
+        f"models/{model_name}", device_map="cpu", trust_remote_code=True
+    )
+    return model.state_dict()
 
 
 def save(model, model_name):
