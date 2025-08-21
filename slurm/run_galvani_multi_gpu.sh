@@ -20,4 +20,4 @@ source $HOME/.bashrc
 source $HOME/wild-llamas/.venv/bin/activate
 
 additional_params="$@"
-python main.py model_dir=/mnt/lustre/work/bethge/dziadzio08/wild-llamas/models num_gpus=8 $additional_params
+python main.py model_dir=/mnt/lustre/work/bethge/dziadzio08/wild-llamas/models $additional_params

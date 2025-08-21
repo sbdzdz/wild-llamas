@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
     if not resume:
         shutil.copytree(base_model_path, merged_model_path)
         current_accuracy = evaluate(
-            base_model_id, "outputs/opencompass/merged_model/step_0", cfg.num_gpus
+            base_model_id, "outputs/opencompass/merged_model/step_0"
         )
         log_merged_model(base_model_id, current_accuracy, current_accuracy)
         merged_state_dict = deepcopy(base_model.state_dict())
@@ -105,7 +105,7 @@ def main(cfg: DictConfig):
             log_skipped_model(model.id, "nearly_equal")
             continue
 
-        current_accuracy = evaluate(model.id, None, cfg.num_gpus)
+        current_accuracy = evaluate(model.id, None)
 
         if current_accuracy < 60.0:
             log_skipped_model(model.id, "poor_performance")
@@ -119,7 +119,6 @@ def main(cfg: DictConfig):
         merged_accuracy = evaluate(
             "merged_model",
             f"outputs/opencompass/merged_model/step_{merging_step}",
-            cfg.num_gpus,
         )
         log_merged_model(model.id, current_accuracy, merged_accuracy)
 
@@ -268,13 +267,12 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, output_dir=None, num_gpus=1):
+def evaluate(model_id, output_dir=None):
     """Evaluate a model and return its accuracy.
 
     Args:
         model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
-        work_dir: Optional work directory. If None, derives from model_id
-        num_gpus: Number of GPUs to use for evaluation
+        output_dir: Optional output directory. If None, derives from model_id
     """
     model_name = model_id.replace("/", "--")
     model_path = f"models/{model_name}"
@@ -293,6 +291,7 @@ def evaluate(model_id, output_dir=None, num_gpus=1):
     set_eval_model_symlink(model_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    num_gpus = torch.cuda.device_count()
     cuda_devices = ",".join(str(i) for i in range(num_gpus))
 
     subprocess.run(
