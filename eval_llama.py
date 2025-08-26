@@ -3,6 +3,9 @@ from mmengine.config import read_base
 
 with read_base():
     from opencompass.configs.datasets.mmlu.mmlu_gen_4d595a import mmlu_datasets
+    from opencompass.configs.datasets.math.math_500_gen import math_datasets
+    from opencompass.configs.datasets.gpqa.gpqa_gen import gpqa_datasets
+
 
 api_meta_template = dict(
     round=[
@@ -14,6 +17,8 @@ api_meta_template = dict(
 
 datasets = [
     *mmlu_datasets,
+    *math_datasets,
+    *gpqa_datasets,
 ]
 
 models = [
@@ -22,7 +27,7 @@ models = [
         abbr="eval_model",
         path="models/eval_model",
         engine_config=dict(max_batch_size=16, tp=1),
-        gen_config=dict(top_k=1, temperature=1e-6, top_p=0.9, max_new_tokens=32),
+        gen_config=dict(top_k=1, temperature=1e-6, top_p=0.9, max_new_tokens=1024),
         max_seq_len=16384,
         max_out_len=32,
         batch_size=16,
@@ -30,5 +35,3 @@ models = [
         stop_words=["<|end_of_text|>", "<|eot_id|>"],
     )
 ]
-
-work_dir = "outputs/merged-llama3-instruct"
