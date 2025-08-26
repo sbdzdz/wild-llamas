@@ -132,17 +132,21 @@ def plot_accuracy(
         edgecolor="none",
     )
 
-    plt.scatter(
-        steps[1:],
-        current_accuracies[1:],
-        label="Current Model",
-        s=marker_size,
-        color=current_color,
-        zorder=0,
-        edgecolor="none",
-    )
+    current_valid_indices = ~np.isnan(current_accuracies)
+    current_valid_steps = np.array(steps)[current_valid_indices]
+    current_valid_accuracies = np.array(current_accuracies)[current_valid_indices]
 
-    # Plot merged model line and points, filtering out NaN values
+    if len(current_valid_steps) > 1:
+        plt.scatter(
+            current_valid_steps[1:],
+            current_valid_accuracies[1:],
+            label="Current Model",
+            s=marker_size,
+            color=current_color,
+            zorder=0,
+            edgecolor="none",
+        )
+
     valid_indices = ~np.isnan(merged_accuracies)
     valid_steps = np.array(steps)[valid_indices]
     valid_merged = np.array(merged_accuracies)[valid_indices]
@@ -218,30 +222,40 @@ def load_summary_data():
         model_name = model_id.replace("/", "--")
 
         try:
-            # Always get current model accuracy (for all steps)
-            current_df = get_individual_accuracies(
-                outputs_dir / f"opencompass/{model_name}"
-            )
+            current_model_dir = outputs_dir / f"opencompass/{model_name}"
+            has_current_eval = current_model_dir.exists()
 
-            # Only get merged model accuracy if this step was evaluated
-            if step in evaluated_steps:
+            has_merged_eval = step in evaluated_steps
+
+            if has_current_eval and has_merged_eval:
+                current_df = get_individual_accuracies(current_model_dir)
                 merged_df = get_individual_accuracies(
                     outputs_dir / f"opencompass/merged_model/step_{step}"
                 )
-
                 step_df = pd.merge(
                     current_df[["dataset", "eval_model"]],
                     merged_df[["dataset", "eval_model"]],
                     on="dataset",
                     suffixes=("_current", "_merged"),
                 )
-            else:
-                # Create DataFrame with current accuracy but NaN for merged
+            elif has_current_eval and not has_merged_eval:
+                current_df = get_individual_accuracies(current_model_dir)
                 step_df = current_df[["dataset", "eval_model"]].copy()
                 step_df.rename(
                     columns={"eval_model": "eval_model_current"}, inplace=True
                 )
                 step_df["eval_model_merged"] = float("nan")
+            elif not has_current_eval and has_merged_eval:
+                merged_df = get_individual_accuracies(
+                    outputs_dir / f"opencompass/merged_model/step_{step}"
+                )
+                step_df = merged_df[["dataset", "eval_model"]].copy()
+                step_df.rename(
+                    columns={"eval_model": "eval_model_merged"}, inplace=True
+                )
+                step_df["eval_model_current"] = float("nan")
+            else:
+                continue
 
             step_df["step"] = step
             all_data.append(step_df)
