@@ -116,10 +116,17 @@ def main(cfg: DictConfig):
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
         save(base_model, "merged_model")
-        merged_accuracy = evaluate(
-            "merged_model",
-            f"outputs/opencompass/merged_model/step_{merging_step}",
-        )
+        if (
+            merging_step % cfg.eval_every_n_merges == 0
+            or merging_step == cfg.model_limit
+        ):
+            merged_accuracy = evaluate(
+                "merged_model",
+                f"outputs/opencompass/merged_model/step_{merging_step}",
+            )
+        else:
+            merged_accuracy = None
+
         log_merged_model(model.id, current_accuracy, merged_accuracy)
 
         if merging_step > cfg.model_limit:
@@ -359,7 +366,9 @@ def log_merged_model(model_id, current_accuracy, merged_accuracy):
             writer.writerow(["model_id", "current_accuracy", "merged_accuracy"])
     with open(log_file, "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow([model_id, current_accuracy, merged_accuracy])
+        # Use empty string for None values to maintain CSV structure
+        merged_acc_value = merged_accuracy if merged_accuracy is not None else ""
+        writer.writerow([model_id, current_accuracy, merged_acc_value])
 
 
 def log_skipped_model(model_id, reason):
