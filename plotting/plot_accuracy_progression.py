@@ -2,6 +2,7 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from pathlib import Path
 import argparse
 
@@ -141,9 +142,14 @@ def plot_accuracy(
         edgecolor="none",
     )
 
+    # Plot merged model line and points, filtering out NaN values
+    valid_indices = ~np.isnan(merged_accuracies)
+    valid_steps = np.array(steps)[valid_indices]
+    valid_merged = np.array(merged_accuracies)[valid_indices]
+
     plt.plot(
-        steps,
-        merged_accuracies,
+        valid_steps,
+        valid_merged,
         "-",
         linewidth=2,
         color=merged_color,
@@ -151,8 +157,8 @@ def plot_accuracy(
         zorder=1,
     )
     plt.scatter(
-        steps[1:],
-        merged_accuracies[1:],
+        valid_steps[1:],
+        valid_merged[1:],
         label="Merged Model",
         s=marker_size,
         color=merged_color,
@@ -172,9 +178,9 @@ def plot_accuracy(
         plt.ylim(ylim)
 
     if show_annotations:
-        annotation_step = max(1, len(steps) // 10) if len(steps) > 20 else 1
+        annotation_step = max(1, len(valid_steps) // 10) if len(valid_steps) > 20 else 1
 
-        for i, (step, merged) in enumerate(zip(steps, merged_accuracies)):
+        for i, (step, merged) in enumerate(zip(valid_steps, valid_merged)):
             if i == 0 or i % annotation_step == 0:
                 is_base = i == 0
                 plt.annotate(
@@ -196,35 +202,56 @@ def load_summary_data():
     df_log = pd.read_csv(outputs_dir / "merge_log.csv")
     merged_models = df_log["model_id"].tolist()
 
+    # Find which steps have merged model evaluations
     merged_model_dir = outputs_dir / "opencompass/merged_model"
     step_dirs = sorted(
         [d for d in merged_model_dir.iterdir() if d.name.startswith("step_")]
     )
 
-    num_available = min(len(step_dirs), len(merged_models))
-    step_dirs = step_dirs[:num_available]
-    merged_models = merged_models[:num_available]
-
-    print(f"Found {num_available} steps")
+    evaluated_steps = set()
+    for step_dir in step_dirs:
+        step_num = int(step_dir.name.split("_")[1])
+        evaluated_steps.add(step_num)
 
     all_data = []
     for step, model_id in enumerate(merged_models):
         model_name = model_id.replace("/", "--")
-        current_df = get_individual_accuracies(
-            outputs_dir / f"opencompass/{model_name}"
-        )
-        merged_df = get_individual_accuracies(
-            outputs_dir / f"opencompass/merged_model/step_{step}"
-        )
 
-        step_df = pd.merge(
-            current_df[["dataset", "eval_model"]],
-            merged_df[["dataset", "eval_model"]],
-            on="dataset",
-            suffixes=("_current", "_merged"),
-        )
-        step_df["step"] = step
-        all_data.append(step_df)
+        try:
+            # Always get current model accuracy (for all steps)
+            current_df = get_individual_accuracies(
+                outputs_dir / f"opencompass/{model_name}"
+            )
+
+            # Only get merged model accuracy if this step was evaluated
+            if step in evaluated_steps:
+                merged_df = get_individual_accuracies(
+                    outputs_dir / f"opencompass/merged_model/step_{step}"
+                )
+
+                step_df = pd.merge(
+                    current_df[["dataset", "eval_model"]],
+                    merged_df[["dataset", "eval_model"]],
+                    on="dataset",
+                    suffixes=("_current", "_merged"),
+                )
+            else:
+                # Create DataFrame with current accuracy but NaN for merged
+                step_df = current_df[["dataset", "eval_model"]].copy()
+                step_df.rename(
+                    columns={"eval_model": "eval_model_current"}, inplace=True
+                )
+                step_df["eval_model_merged"] = float("nan")
+
+            step_df["step"] = step
+            all_data.append(step_df)
+
+        except Exception as e:
+            print(f"Warning: Could not process step {step} for model {model_id}: {e}")
+            continue
+
+    if not all_data:
+        raise RuntimeError("No valid evaluation data found")
 
     return pd.concat(all_data, ignore_index=True)
 
