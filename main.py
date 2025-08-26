@@ -105,11 +105,13 @@ def main(cfg: DictConfig):
             log_skipped_model(model.id, "nearly_equal")
             continue
 
-        current_accuracy = evaluate(model.id, None)
-
-        if current_accuracy < 60.0:
-            log_skipped_model(model.id, "poor_performance")
-            continue
+        if cfg.evaluate_current:
+            current_accuracy = evaluate(model.id)
+            if current_accuracy < 60.0:
+                log_skipped_model(model.id, "poor_performance")
+                continue
+        else:
+            current_accuracy = None
 
         merging_step += 1
         print(f"Merging {model.id}...")
@@ -366,9 +368,9 @@ def log_merged_model(model_id, current_accuracy, merged_accuracy):
             writer.writerow(["model_id", "current_accuracy", "merged_accuracy"])
     with open(log_file, "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        # Use empty string for None values to maintain CSV structure
+        current_acc_value = current_accuracy if current_accuracy is not None else ""
         merged_acc_value = merged_accuracy if merged_accuracy is not None else ""
-        writer.writerow([model_id, current_accuracy, merged_acc_value])
+        writer.writerow([model_id, current_acc_value, merged_acc_value])
 
 
 def log_skipped_model(model_id, reason):
