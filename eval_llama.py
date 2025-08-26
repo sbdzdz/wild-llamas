@@ -3,6 +3,7 @@ from mmengine.config import read_base
 
 with read_base():
     from opencompass.configs.datasets.mmlu.mmlu_gen_4d595a import mmlu_datasets
+    from opencompass.configs.datasets.mmlu_pro.mmlu_pro_gen import mmlu_pro_datasets
     from opencompass.configs.datasets.math.math_500_gen import math_datasets
     from opencompass.configs.datasets.gpqa.gpqa_gen import gpqa_datasets
 
@@ -17,6 +18,7 @@ api_meta_template = dict(
 
 datasets = [
     *mmlu_datasets,
+    *mmlu_pro_datasets,
     *math_datasets,
     *gpqa_datasets,
 ]
