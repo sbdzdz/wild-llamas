@@ -19,6 +19,10 @@ DATASET_CATEGORIES = {
         "prefix": "GPQA_diamond",
         "display_name": "GPQA Diamond",
     },
+    "math500": {
+        "prefix": "math-500",
+        "display_name": "Math-500",
+    },
 }
 
 
@@ -34,7 +38,7 @@ def create_category_plots(ylim=None):
     figures_dir.mkdir(exist_ok=True)
 
     for category_info in DATASET_CATEGORIES.values():
-        if category_info["prefix"] == "GPQA_diamond":
+        if category_info["prefix"] in ["GPQA_diamond", "math-500"]:
             category_df = df[df["dataset"] == category_info["prefix"]]
         else:
             category_df = df[df["dataset"].str.startswith(category_info["prefix"])]
