@@ -47,8 +47,11 @@ def main(cfg: DictConfig):
     resume = merged_model_path.exists()
     if not resume:
         shutil.copytree(base_model_path, merged_model_path)
+        step_dir = TOP_DIR / "outputs/opencompass/merged_model/step_0"
         current_accuracy = evaluate(
-            base_model_id, TOP_DIR / "outputs/opencompass/merged_model/step_0"
+            base_model_id,
+            step_dir,
+            cfg.eval_runs,
         )
         log_merged_model(base_model_id, current_accuracy, current_accuracy)
         merged_state_dict = deepcopy(base_model.state_dict())
@@ -61,11 +64,6 @@ def main(cfg: DictConfig):
         merged_state_dict = merged_model.state_dict()
         base_model.load_state_dict(merged_state_dict)
         merging_step = len([m for m in merged_models if m != base_model_id])
-
-        step_0_path = TOP_DIR / "outputs/opencompass/merged_model/step_0"
-        if not step_0_path.exists():
-            print("Base model evaluation (step_0) missing, evaluating now...")
-            evaluate(base_model_id, step_0_path)
 
         print(f"Resuming from merging step {merging_step}")
 
@@ -114,7 +112,7 @@ def main(cfg: DictConfig):
             continue
 
         if cfg.evaluate_current:
-            current_accuracy = evaluate(model.id)
+            current_accuracy = evaluate(model.id, eval_runs=cfg.eval_runs)
             if current_accuracy < 60.0:
                 log_skipped_model(model.id, "poor_performance")
                 continue
@@ -130,9 +128,11 @@ def main(cfg: DictConfig):
             merging_step % cfg.eval_every_n_merges == 0
             or merging_step == cfg.model_limit
         ):
+            step_dir = TOP_DIR / f"outputs/opencompass/merged_model/step_{merging_step}"
             merged_accuracy = evaluate(
                 "merged_model",
-                TOP_DIR / f"outputs/opencompass/merged_model/step_{merging_step}",
+                step_dir,
+                cfg.eval_runs,
             )
         else:
             merged_accuracy = None
@@ -284,12 +284,16 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, output_dir=None):
-    """Evaluate a model and return its accuracy.
+def evaluate(model_id, output_dir=None, eval_runs=1):
+    """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
         model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
         output_dir: Optional output directory. If None, derives from model_id
+        eval_runs: Number of evaluation runs to perform
+
+    Returns:
+        float: Mean accuracy across all evaluation runs
     """
     model_name = model_id.replace("/", "--")
     model_path = TOP_DIR / f"models/{model_name}"
@@ -299,11 +303,12 @@ def evaluate(model_id, output_dir=None):
         output_dir = Path(output_dir)
 
     if output_dir.exists():
-        print(f"Using existing evaluation results at {output_dir}")
         subdirs = [d for d in output_dir.iterdir() if d.is_dir()]
-        assert len(subdirs) == 1, f"Expected exactly one directory in {output_dir}"
-        timestamp_dir = subdirs[0]
-        return get_accuracy(timestamp_dir)
+        if len(subdirs) == eval_runs:
+            print(f"Using existing evaluation results at {output_dir}")
+            accuracies = [get_accuracy(subdir) for subdir in subdirs]
+            mean_accuracy = sum(accuracies) / len(accuracies)
+            return mean_accuracy
 
     set_eval_model_symlink(model_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -311,20 +316,49 @@ def evaluate(model_id, output_dir=None):
     num_gpus = torch.cuda.device_count()
     cuda_devices = ",".join(str(i) for i in range(num_gpus))
 
-    subprocess.run(
-        [
-            "opencompass",
-            "eval_llama.py",
-            "--work-dir",
-            output_dir,
-            "--max-num-worker",
-            str(num_gpus),
-        ],
-        env={"CUDA_VISIBLE_DEVICES": cuda_devices, **os.environ},
-        check=True,
+    accuracies = []
+
+    for run_idx in range(eval_runs):
+        print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_id}")
+
+        subprocess.run(
+            [
+                "opencompass",
+                "eval_llama.py",
+                "--work-dir",
+                output_dir,
+                "--max-num-worker",
+                str(num_gpus),
+            ],
+            env={"CUDA_VISIBLE_DEVICES": cuda_devices, **os.environ},
+            check=True,
+        )
+
+        latest_dir = get_latest_subdir(output_dir)
+        accuracy = get_accuracy(latest_dir)
+        accuracies.append(accuracy)
+        print(f"Run {run_idx + 1} accuracy: {accuracy:.2f}")
+
+    mean_accuracy = sum(accuracies) / len(accuracies)
+    return mean_accuracy
+
+
+def get_latest_subdir(parent_dir):
+    """Get the most recently modified subdirectory from a parent directory.
+
+    Args:
+        parent_dir: Path to the parent directory
+
+    Returns:
+        Path to the most recently modified subdirectory
+    """
+    return next(
+        d
+        for d in sorted(
+            parent_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True
+        )
+        if d.is_dir()
     )
-    timestamp_dir = next(d for d in output_dir.iterdir() if d.is_dir())
-    return get_accuracy(timestamp_dir)
 
 
 def set_eval_model_symlink(target):

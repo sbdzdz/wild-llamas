@@ -47,12 +47,24 @@ def create_category_plots(ylim=None):
             print(f"No data found for {category_info['display_name']}")
             continue
 
-        avg_df = category_df.groupby("step").agg({"accuracy": "mean"}).reset_index()
+        # Proper statistical aggregation: first average per run, then compute statistics
+        steps = []
+        accuracies = []
+        stds = []
 
-        steps = avg_df["step"].tolist()
-        accuracies = avg_df["accuracy"].tolist()
+        for step in sorted(category_df["step"].unique()):
+            step_data = category_df[category_df["step"] == step]
 
-        plot_single_category_accuracy(steps, accuracies, ylim=ylim)
+            run_averages = step_data.groupby("run")["accuracy"].mean()
+
+            mean_accuracy = run_averages.mean()
+            std_accuracy = run_averages.std() if len(run_averages) > 1 else 0.0
+
+            steps.append(step)
+            accuracies.append(mean_accuracy)
+            stds.append(std_accuracy)
+
+        plot_single_category_accuracy(steps, accuracies, stds, ylim=ylim)
 
         plt.title(
             f"LLaMA-3.1-8B-Instruct {category_info['display_name']} Accuracy Across Merging Steps",
@@ -75,6 +87,7 @@ def create_category_plots(ylim=None):
 def plot_single_category_accuracy(
     steps,
     accuracies,
+    stds=None,
     ylim=None,
     show_annotations=True,
 ):
@@ -100,14 +113,29 @@ def plot_single_category_accuracy(
     valid_steps = np.array(steps)[valid_indices]
     valid_accuracies = np.array(accuracies)[valid_indices]
 
+    if stds is not None:
+        valid_stds = np.array(stds)[valid_indices]
+    else:
+        valid_stds = np.zeros_like(valid_accuracies)
+
     plt.plot(
         valid_steps,
         valid_accuracies,
         "-",
         linewidth=2,
         color=merged_color,
-        alpha=0.4,
+        alpha=0.8,
+        zorder=2,
+    )
+
+    plt.fill_between(
+        valid_steps,
+        valid_accuracies - valid_stds,
+        valid_accuracies + valid_stds,
+        color=merged_color,
+        alpha=0.2,
         zorder=1,
+        label="±1 standard deviation",
     )
 
     if len(valid_steps) > 1:
@@ -118,7 +146,7 @@ def plot_single_category_accuracy(
             s=marker_size,
             color=merged_color,
             alpha=1.0,
-            zorder=2,
+            zorder=3,
             edgecolor="none",
         )
 
@@ -178,19 +206,40 @@ def load_summary_data():
 
 
 def get_individual_accuracies(work_dir):
-    """Get individual accuracies for each dataset from a model directory."""
+    """Get individual accuracies for each dataset from a model directory.
+
+    Returns raw run data to allow proper statistical aggregation at the category level.
+    """
     step_dir = Path(work_dir)
     subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
-    if len(subdirs) != 1:
-        raise RuntimeError(
-            f"Expected exactly one directory in {work_dir}, found {len(subdirs)}"
-        )
-    summary_dir = subdirs[0] / "summary"
-    csv_file = next(summary_dir.glob("*.csv"))
-    df = pd.read_csv(csv_file)
-    df = df.rename(columns={"eval_model": "accuracy"})
-    df["accuracy"] = pd.to_numeric(df["accuracy"].replace("-", 0), errors="coerce")
-    return df[["dataset", "accuracy"]]
+
+    if len(subdirs) == 0:
+        raise RuntimeError(f"No evaluation directories found in {work_dir}")
+
+    all_run_data = []
+
+    for subdir in subdirs:
+        summary_dir = subdir / "summary"
+        if not summary_dir.exists():
+            continue
+
+        csv_files = list(summary_dir.glob("*.csv"))
+        if not csv_files:
+            continue
+
+        csv_file = csv_files[0]
+        df = pd.read_csv(csv_file)
+        df = df.rename(columns={"eval_model": "accuracy"})
+        df["accuracy"] = pd.to_numeric(df["accuracy"].replace("-", 0), errors="coerce")
+        df = df[["dataset", "accuracy"]]
+        df["run"] = subdir.name  # Add run identifier
+        all_run_data.append(df)
+
+    if not all_run_data:
+        raise RuntimeError(f"No valid evaluation data found in {work_dir}")
+
+    combined_df = pd.concat(all_run_data, ignore_index=True)
+    return combined_df[["dataset", "accuracy", "run"]]
 
 
 def main():

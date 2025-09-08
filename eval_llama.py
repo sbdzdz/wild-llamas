@@ -29,7 +29,7 @@ models = [
         abbr="eval_model",
         path="models/eval_model",
         engine_config=dict(max_batch_size=16, tp=1),
-        gen_config=dict(top_k=1, temperature=1e-6, top_p=0.9, max_new_tokens=4096),
+        gen_config=dict(temperature=0.7, top_k=20, top_p=0.8, max_new_tokens=4096),
         max_seq_len=8192,
         max_out_len=4096,
         batch_size=16,

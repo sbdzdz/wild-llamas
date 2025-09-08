@@ -3,6 +3,7 @@ model_limit: 250
 model_dir: null
 eval_every_n_merges: 10
 evaluate_current: false
+eval_runs: 5
 
 hydra:
   run:
