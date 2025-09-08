@@ -21,6 +21,8 @@ from transformers import AutoModelForCausalLM
 
 from merge import create_merge_instance
 
+TOP_DIR = Path(__file__).parent
+
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
@@ -40,13 +42,13 @@ def main(cfg: DictConfig):
     )
     base_state_dict = base_model.state_dict()
 
-    merged_model_path = Path("models/merged_model")
+    merged_model_path = TOP_DIR / "models/merged_model"
 
     resume = merged_model_path.exists()
     if not resume:
         shutil.copytree(base_model_path, merged_model_path)
         current_accuracy = evaluate(
-            base_model_id, "outputs/opencompass/merged_model/step_0"
+            base_model_id, TOP_DIR / "outputs/opencompass/merged_model/step_0"
         )
         log_merged_model(base_model_id, current_accuracy, current_accuracy)
         merged_state_dict = deepcopy(base_model.state_dict())
@@ -59,6 +61,12 @@ def main(cfg: DictConfig):
         merged_state_dict = merged_model.state_dict()
         base_model.load_state_dict(merged_state_dict)
         merging_step = len([m for m in merged_models if m != base_model_id])
+
+        step_0_path = TOP_DIR / "outputs/opencompass/merged_model/step_0"
+        if not step_0_path.exists():
+            print("Base model evaluation (step_0) missing, evaluating now...")
+            evaluate(base_model_id, step_0_path)
+
         print(f"Resuming from merging step {merging_step}")
 
     merger = create_merge_instance(cfg)
@@ -124,7 +132,7 @@ def main(cfg: DictConfig):
         ):
             merged_accuracy = evaluate(
                 "merged_model",
-                f"outputs/opencompass/merged_model/step_{merging_step}",
+                TOP_DIR / f"outputs/opencompass/merged_model/step_{merging_step}",
             )
         else:
             merged_accuracy = None
@@ -137,7 +145,7 @@ def main(cfg: DictConfig):
 
 def setup_model_directory(cfg: DictConfig):
     """Setup model directory and create symlink if model_dir is specified."""
-    models_dir = Path("models")
+    models_dir = TOP_DIR / "models"
 
     if cfg.get("model_dir"):
         model_dir_path = Path(cfg.model_dir)
@@ -158,7 +166,7 @@ def setup_model_directory(cfg: DictConfig):
 
 def load_skipped_models():
     """Load list of model IDs that have been skipped from skipped_models.csv."""
-    skipped_file = Path(__file__).parent / "skipped_models.csv"
+    skipped_file = TOP_DIR / "skipped_models.csv"
     if not skipped_file.exists():
         return set()
 
@@ -168,7 +176,7 @@ def load_skipped_models():
 
 def load_merged_models():
     """Load list of model IDs that have been successfully merged from merge_log.csv."""
-    log_file = Path(__file__).parent / "outputs/merge_log.csv"
+    log_file = TOP_DIR / "outputs/merge_log.csv"
     if not log_file.exists():
         return []
 
@@ -209,7 +217,7 @@ def fetch_or_load_models(api, base_model_id):
 
 def load_all_models():
     """Load list of all model IDs from all_models.csv."""
-    all_models_file = Path(__file__).parent / "all_models.csv"
+    all_models_file = TOP_DIR / "all_models.csv"
     if not all_models_file.exists():
         return None
 
@@ -219,7 +227,7 @@ def load_all_models():
 
 def save_all_models(model_ids):
     """Save the list of all model IDs to all_models.csv."""
-    all_models_file = Path(__file__).parent / "all_models.csv"
+    all_models_file = TOP_DIR / "all_models.csv"
 
     df = pd.DataFrame({"model_id": model_ids})
     df.to_csv(all_models_file, index=False)
@@ -260,7 +268,7 @@ def tensors_match(sd1, sd2):
 def download(model_id):
     """Download a model from HuggingFace Hub to a model-specific directory."""
     model_name = model_id.replace("/", "--")
-    model_path = Path(f"models/{model_name}")
+    model_path = TOP_DIR / f"models/{model_name}"
 
     if model_path.exists():
         print(f"Model {model_id} already exists at {model_path}, skipping download.")
@@ -284,9 +292,9 @@ def evaluate(model_id, output_dir=None):
         output_dir: Optional output directory. If None, derives from model_id
     """
     model_name = model_id.replace("/", "--")
-    model_path = f"models/{model_name}"
+    model_path = TOP_DIR / f"models/{model_name}"
     if output_dir is None:
-        output_dir = Path(f"outputs/opencompass/{model_name}")
+        output_dir = TOP_DIR / f"outputs/opencompass/{model_name}"
     else:
         output_dir = Path(output_dir)
 
@@ -320,7 +328,7 @@ def evaluate(model_id, output_dir=None):
 
 
 def set_eval_model_symlink(target):
-    symlink_path = Path("models/eval_model")
+    symlink_path = TOP_DIR / "models/eval_model"
     if symlink_path.is_symlink() or symlink_path.exists():
         symlink_path.unlink()
     target_abs = Path(target).resolve()
@@ -345,14 +353,14 @@ def load(model_id):
     """Load a model from the model directory. Returns None if loading fails."""
     model_name = model_id.replace("/", "--")
     model = AutoModelForCausalLM.from_pretrained(
-        f"models/{model_name}", device_map="cpu", trust_remote_code=True
+        TOP_DIR / f"models/{model_name}", device_map="cpu", trust_remote_code=True
     )
     return model.state_dict()
 
 
 def save(model, model_name):
     """Save the merged model."""
-    model_path = Path(f"models/{model_name}")
+    model_path = TOP_DIR / f"models/{model_name}"
     model_path.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(model_path)
     print(f"Saved merged model to {model_path}")
@@ -360,7 +368,7 @@ def save(model, model_name):
 
 def log_merged_model(model_id, current_accuracy, merged_accuracy):
     """Log a successful merge to the merge log."""
-    log_file = Path(__file__).parent / "outputs/merge_log.csv"
+    log_file = TOP_DIR / "outputs/merge_log.csv"
     log_file.parent.mkdir(exist_ok=True)
     if not log_file.exists():
         with open(log_file, "w", newline="") as csvfile:
@@ -375,7 +383,7 @@ def log_merged_model(model_id, current_accuracy, merged_accuracy):
 
 def log_skipped_model(model_id, reason):
     """Save a skipped model to skipped_models.csv."""
-    skipped_file = Path(__file__).parent / "skipped_models.csv"
+    skipped_file = TOP_DIR / "skipped_models.csv"
 
     if not skipped_file.exists():
         skipped_file.write_text("model_id,reason\n")
