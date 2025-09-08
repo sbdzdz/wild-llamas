@@ -2,7 +2,7 @@ from opencompass.models import TurboMindModelwithChatTemplate
 from mmengine.config import read_base
 
 with read_base():
-    from opencompass.configs.datasets.mmlu.mmlu_gen_4d595a import mmlu_datasets
+    from opencompass.configs.datasets.mmlu.mmlu_gen import mmlu_datasets
     from opencompass.configs.datasets.mmlu_pro.mmlu_pro_gen import mmlu_pro_datasets
     from opencompass.configs.datasets.math.math_500_gen import math_datasets
     from opencompass.configs.datasets.gpqa.gpqa_gen import gpqa_datasets
