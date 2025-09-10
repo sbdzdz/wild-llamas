@@ -135,7 +135,7 @@ def plot_single_category_accuracy(
         color=merged_color,
         alpha=0.2,
         zorder=1,
-        label="±1 standard deviation",
+        linewidth=0,
     )
 
     if len(valid_steps) > 1:
