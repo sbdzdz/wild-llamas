@@ -3,6 +3,7 @@ __pycache__/
 models
 outputs/
 tmp/
+figures/old/
 
 .vscode/
 .cache/
