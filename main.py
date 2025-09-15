@@ -29,6 +29,13 @@ def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
 
+    configured_root = Path(cfg.get("output_dir", "outputs/opencompass"))
+    opencompass_root = (
+        configured_root
+        if configured_root.is_absolute()
+        else (TOP_DIR / configured_root)
+    )
+
     setup_model_directory(cfg)
 
     skipped_models = load_skipped_models()
@@ -47,10 +54,10 @@ def main(cfg: DictConfig):
     resume = merged_model_path.exists()
     if not resume:
         shutil.copytree(base_model_path, merged_model_path)
-        step_dir = TOP_DIR / "outputs/opencompass/merged_model/step_0"
+        base_eval_dir = opencompass_root / "merged_model" / "step_0"
         current_accuracy = evaluate(
             base_model_id,
-            step_dir,
+            base_eval_dir,
             cfg.eval_runs,
         )
         log_merged_model(base_model_id, current_accuracy, current_accuracy)
@@ -112,7 +119,13 @@ def main(cfg: DictConfig):
             continue
 
         if cfg.evaluate_current:
-            current_accuracy = evaluate(model.id, eval_runs=cfg.eval_runs)
+            model_name = model.id.replace("/", "--")
+            model_eval_dir = opencompass_root / f"models/{model_name}"
+            current_accuracy = evaluate(
+                model.id,
+                output_dir=model_eval_dir,
+                eval_runs=cfg.eval_runs,
+            )
             if current_accuracy < 60.0:
                 log_skipped_model(model.id, "poor_performance")
                 continue
@@ -128,11 +141,11 @@ def main(cfg: DictConfig):
             merging_step % cfg.eval_every_n_merges == 0
             or merging_step == cfg.model_limit
         ):
-            step_dir = TOP_DIR / f"outputs/opencompass/merged_model/step_{merging_step}"
+            merged_eval_dir = opencompass_root / "merged_model" / f"step_{merging_step}"
             merged_accuracy = evaluate(
                 "merged_model",
-                step_dir,
-                cfg.eval_runs,
+                output_dir=merged_eval_dir,
+                eval_runs=cfg.eval_runs,
             )
         else:
             merged_accuracy = None
@@ -284,12 +297,12 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, output_dir=None, eval_runs=1):
+def evaluate(model_id, output_dir, eval_runs=1):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
         model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
-        output_dir: Optional output directory. If None, derives from model_id
+        output_dir: Absolute output directory path
         eval_runs: Number of evaluation runs to perform
 
     Returns:
@@ -297,10 +310,7 @@ def evaluate(model_id, output_dir=None, eval_runs=1):
     """
     model_name = model_id.replace("/", "--")
     model_path = TOP_DIR / f"models/{model_name}"
-    if output_dir is None:
-        output_dir = TOP_DIR / f"outputs/opencompass/{model_name}"
-    else:
-        output_dir = Path(output_dir)
+    output_dir = Path(output_dir)
 
     if output_dir.exists():
         subdirs = [d for d in output_dir.iterdir() if d.is_dir()]
