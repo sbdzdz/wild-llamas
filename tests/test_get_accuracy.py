@@ -1,5 +1,6 @@
 from pathlib import Path
 import pandas as pd
+import argparse
 
 
 def get_accuracy(work_dir):
@@ -20,9 +21,15 @@ def get_accuracy(work_dir):
     return df["eval_model"].mean()
 
 
-def test_get_accuracy():
-    """Test the get_accuracy function on all models in outputs/opencompass/."""
-    opencompass_dir = Path("outputs/opencompass")
+def test_get_accuracy(output_dir="outputs/opencompass"):
+    """Test the get_accuracy function on all models in the specified outputs dir.
+
+    Args:
+        output_dir: Path to the OpenCompass output directory containing evaluation results
+    """
+    opencompass_dir = Path(output_dir)
+    if not opencompass_dir.is_absolute():
+        opencompass_dir = (Path(__file__).parent.parent / opencompass_dir).resolve()
 
     if not opencompass_dir.exists():
         print(f"Directory {opencompass_dir} does not exist")
@@ -78,5 +85,22 @@ def test_get_accuracy():
                     print(f"  {step_dir.name:15} -> ERROR: {e}")
 
 
+def main():
+    """Main function to run the test with command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Test the get_accuracy function on all models in the outputs directory."
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="outputs/opencompass",
+        help="Path to the OpenCompass output directory containing evaluation results (default: outputs/opencompass)",
+    )
+
+    args = parser.parse_args()
+    test_get_accuracy(output_dir=args.output_dir)
+
+
 if __name__ == "__main__":
-    test_get_accuracy()
+    main()

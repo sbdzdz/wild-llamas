@@ -26,14 +26,19 @@ DATASET_CATEGORIES = {
 }
 
 
-def plot_accuracy_progression(ylim=None):
-    """Create the accuracy progression plot."""
-    create_category_plots(ylim)
+def plot_accuracy_progression(output_dir, ylim=None):
+    """Create the accuracy progression plot.
+
+    Args:
+        output_dir: Path to the OpenCompass output directory containing evaluation results
+        ylim: Optional tuple of (ymin, ymax) for y-axis limits
+    """
+    create_category_plots(output_dir, ylim)
 
 
-def create_category_plots(ylim=None):
+def create_category_plots(output_dir, ylim=None):
     """Create separate plots for each dataset category."""
-    df = load_summary_data()
+    df = load_summary_data(output_dir)
     figures_dir = (Path(__file__) / "../../figures").resolve()
     figures_dir.mkdir(exist_ok=True)
 
@@ -178,10 +183,14 @@ def plot_single_category_accuracy(
                 )
 
 
-def load_summary_data():
-    """Load all summary CSV files and extract accuracies for each dataset."""
-    outputs_dir = (Path(__file__) / "../../outputs").resolve()
-    merged_model_dir = outputs_dir / "opencompass/merged_model"
+def load_summary_data(output_dir):
+    """Load all summary CSV files and extract accuracies for each dataset.
+
+    Args:
+        output_dir: Path to the OpenCompass output directory containing evaluation results
+    """
+    opencompass_root = Path(output_dir)
+    merged_model_dir = opencompass_root / "merged_model"
     step_dirs = sorted(
         [d for d in merged_model_dir.iterdir() if d.name.startswith("step_")]
     )
@@ -249,6 +258,12 @@ def main():
     )
 
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="outputs/opencompass",
+        help="Path to the OpenCompass output directory containing evaluation results (default: outputs/opencompass)",
+    )
+    parser.add_argument(
         "--ylim",
         nargs=2,
         type=float,
@@ -258,7 +273,7 @@ def main():
     )
     args = parser.parse_args()
     ylim = tuple(args.ylim) if args.ylim is not None else None
-    plot_accuracy_progression(ylim=ylim)
+    plot_accuracy_progression(output_dir=args.output_dir, ylim=ylim)
 
 
 if __name__ == "__main__":
