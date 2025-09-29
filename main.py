@@ -52,8 +52,28 @@ def main(cfg: DictConfig):
     merged_model_path = TOP_DIR / "models/merged_model"
 
     resume = merged_model_path.exists()
-    if not resume:
-        shutil.copytree(base_model_path, merged_model_path)
+
+    if resume:
+        merged_model = AutoModelForCausalLM.from_pretrained(
+            merged_model_path, device_map="cpu", trust_remote_code=True
+        )
+        merged_state_dict = merged_model.state_dict()
+        base_model.load_state_dict(merged_state_dict)
+        merging_step = len([m for m in merged_models if m != base_model_id])
+        print(f"Resuming from merging step {merging_step}")
+    else:
+        shutil.copytree(
+            base_model_path,
+            merged_model_path,
+            ignore=shutil.ignore_patterns(
+                ".cache",
+                "*.lock",
+                "*.safetensors",
+                "model.safetensors.index.json",
+                "pytorch_model.bin",
+                ".gitattributes",
+            ),
+        )
         base_eval_dir = opencompass_root / "merged_model" / "step_0"
         current_accuracy = evaluate(
             base_model_id,
@@ -64,15 +84,6 @@ def main(cfg: DictConfig):
         merged_state_dict = deepcopy(base_model.state_dict())
         merging_step = 0
         print("Starting from scratch")
-    else:
-        merged_model = AutoModelForCausalLM.from_pretrained(
-            merged_model_path, device_map="cpu", trust_remote_code=True
-        )
-        merged_state_dict = merged_model.state_dict()
-        base_model.load_state_dict(merged_state_dict)
-        merging_step = len([m for m in merged_models if m != base_model_id])
-
-        print(f"Resuming from merging step {merging_step}")
 
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
