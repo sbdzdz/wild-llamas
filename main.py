@@ -211,31 +211,30 @@ def load_merged_models():
 def fetch_or_load_models(api, base_model_id):
     """Fetch model list from API or load from all_models.csv for consistent ordering."""
     model_ids = load_all_models()
+    models = api.list_models(
+        filter=f"base_model:finetune:{base_model_id}",
+        sort="downloads",
+        direction=-1,
+        gated=False,
+        expand=["safetensors", "pipeline_tag"],
+    )
     if model_ids is None:
         print("Fetching model list from HuggingFace API...")
-        models = api.list_models(
-            filter=f"base_model:finetune:{base_model_id}",
-            sort="downloads",
-            direction=-1,
-            gated=False,
-            expand=["downloads", "safetensors", "pipeline_tag"],
-        )
         model_ids = [model.id for model in models]
         save_all_models(model_ids)
         print(f"Saved {len(model_ids)} model IDs to all_models.csv")
         return models
     else:
         print(f"Loaded {len(model_ids)} model IDs from all_models.csv")
-        models = []
-        for model_id in model_ids:
-            try:
-                model_info = api.model_info(
-                    model_id, expand=["downloads", "safetensors", "pipeline_tag"]
-                )
-                models.append(model_info)
-            except Exception as e:
-                print(f"Could not fetch info for {model_id}: {e}")
-                continue
+        id_to_model = {model.id: model for model in models}
+        models = [
+            id_to_model[model_id] for model_id in model_ids if model_id in id_to_model
+        ]
+        missing = [model_id for model_id in model_ids if model_id not in id_to_model]
+        if missing:
+            print(
+                f"Warning: {len(missing)} cached model IDs not returned by API; skipping"
+            )
         return models
 
 
