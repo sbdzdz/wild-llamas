@@ -227,14 +227,12 @@ def fetch_or_load_models(api, base_model_id):
     else:
         print(f"Loaded {len(model_ids)} model IDs from all_models.csv")
         id_to_model = {model.id: model for model in models}
-        models = [
-            id_to_model[model_id] for model_id in model_ids if model_id in id_to_model
-        ]
-        missing = [model_id for model_id in model_ids if model_id not in id_to_model]
-        if missing:
-            print(
-                f"Warning: {len(missing)} cached model IDs not returned by API; skipping"
-            )
+        models = []
+        for model_id in model_ids:
+            if model_id in id_to_model:
+                models.append(id_to_model[model_id])
+            else:
+                print(f"Warning: {model_id} not found in API; skipping")
         return models
 
 
