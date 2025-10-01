@@ -81,12 +81,11 @@ def create_category_plots(output_dir, ylim=None):
         filename = (
             f"accuracy_{category_info['display_name'].replace(' ', '_').lower()}.png"
         )
-        plt.savefig(figures_dir / filename, dpi=300, bbox_inches="tight")
+        output_path = figures_dir / filename
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
         plt.close()
 
-        print(f"Saved: {filename}")
-
-    print(f"All category plots saved to {figures_dir}")
+        print(f"Saved: {output_path.relative_to(figures_dir.parent)}")
 
 
 def plot_single_category_accuracy(
