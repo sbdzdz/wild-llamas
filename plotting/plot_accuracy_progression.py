@@ -72,7 +72,7 @@ def create_category_plots(output_dir, ylim=None):
         plot_single_category_accuracy(steps, accuracies, stds, ylim=ylim)
 
         plt.title(
-            f"LLaMA-3.1-8B-Instruct {category_info['display_name']} Accuracy Across Merging Steps",
+            f"{category_info['display_name']} Accuracy",
             fontsize=14,
             fontweight="bold",
         )
