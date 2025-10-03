@@ -172,8 +172,12 @@ def setup_model_directory(cfg: DictConfig):
     models_dir = TOP_DIR / "models"
 
     if cfg.get("model_dir"):
-        model_dir_path = Path(cfg.model_dir)
-        model_dir_path.mkdir(parents=True, exist_ok=True)
+        actual_models_dir = Path(cfg.model_dir)
+        actual_models_dir.mkdir(parents=True, exist_ok=True)
+
+        if actual_models_dir.resolve() == models_dir.resolve():
+            print(f"Using in-repo models directory at {models_dir.resolve()}")
+            return
 
         if models_dir.exists() or models_dir.is_symlink():
             if models_dir.is_symlink():
@@ -181,9 +185,9 @@ def setup_model_directory(cfg: DictConfig):
             else:
                 shutil.rmtree(models_dir)
 
-        models_dir.symlink_to(model_dir_path.resolve())
-        print(f"Created symlink: models -> {model_dir_path.resolve()}")
-        print(f"All models will be stored in: {model_dir_path.resolve()}")
+        models_dir.symlink_to(actual_models_dir.resolve())
+        print(f"Created symlink: models -> {actual_models_dir.resolve()}")
+        print(f"All models will be stored in: {actual_models_dir.resolve()}")
     else:
         models_dir.mkdir(exist_ok=True)
 
