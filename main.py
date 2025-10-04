@@ -101,6 +101,10 @@ def main(cfg: DictConfig):
             print(f"Skipping {model.id} (already merged)")
             continue
 
+        if not is_approx_8b_params(model):
+            log_skipped_model(model.id, "not_8b")
+            continue
+
         if not is_bf16(model):
             log_skipped_model(model.id, "not_bf16")
             continue
@@ -266,6 +270,11 @@ def is_bf16(model):
 def is_text_generation(model):
     """Check if a model is text generation model."""
     return model.pipeline_tag is None or model.pipeline_tag == "text-generation"
+
+
+def is_approx_8b_params(model):
+    """Return True if model.safetensors.total (param count) is approximately 8B."""
+    return 7_000_000_000 <= int(model.safetensors.total) <= 9_000_000_000
 
 
 def are_nearly_equal(sd1, sd2):
