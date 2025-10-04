@@ -141,7 +141,8 @@ def main(cfg: DictConfig):
                 output_dir=model_eval_dir,
                 eval_runs=cfg.eval_runs,
             )
-            if current_accuracy < 60.0:
+            min_current_accuracy = float(cfg.get("min_current_accuracy", 0.0))
+            if current_accuracy < min_current_accuracy:
                 log_skipped_model(model.id, "poor_performance")
                 continue
         else:
