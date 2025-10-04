@@ -121,7 +121,7 @@ def main(cfg: DictConfig):
             log_skipped_model(model.id, "load_error")
             continue
 
-        if not tensors_match(base_state_dict, current_model_state_dict):
+        if not state_dicts_match(base_state_dict, current_model_state_dict):
             log_skipped_model(model.id, "dtypes_mismatch")
             continue
 
@@ -271,18 +271,16 @@ def is_text_generation(model):
 def are_nearly_equal(sd1, sd2):
     """Check if two state dictionaries are nearly equal."""
     for key in sd1.keys():
-        if sd1[key].shape != sd2[key].shape:
-            return False
         if not torch.allclose(sd1[key], sd2[key]):
             return False
     return True
 
 
-def tensors_match(sd1, sd2):
+def state_dicts_match(sd1, sd2):
     """Check if two state dictionaries have matching keys, dtypes, and shapes."""
+    if set(sd1.keys()) != set(sd2.keys()):
+        return False
     for key in sd1.keys():
-        if key not in sd2:
-            return False
         if sd1[key].dtype != sd2[key].dtype:
             return False
         if sd1[key].shape != sd2[key].shape:
