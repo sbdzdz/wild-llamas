@@ -20,4 +20,4 @@ source $HOME/.bashrc
 source $HOME/wild-llamas/.venv/bin/activate
 
 additional_params="$@"
-python main.py model_dir=/weka/bethge/dziadzio08/wild-llamas/models $additional_params
+python main.py model_dir=/weka/bethge/dziadzio08/wild-llamas/models batch_size=64 $additional_params

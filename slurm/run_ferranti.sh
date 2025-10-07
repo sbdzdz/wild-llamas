@@ -20,4 +20,4 @@ source $HOME/.bashrc
 source $HOME/wild-llamas/.venv/bin/activate
 
 additional_params="$@"
-python main.py $additional_params
+python main.py batch_size=64 $additional_params

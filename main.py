@@ -11,6 +11,9 @@ import shutil
 import subprocess
 from copy import deepcopy
 from pathlib import Path
+import tempfile
+import time
+from contextlib import contextmanager
 
 import hydra
 import pandas as pd
@@ -79,6 +82,7 @@ def main(cfg: DictConfig):
             base_model_id,
             base_eval_dir,
             cfg.eval_runs,
+            batch_size=int(cfg["batch_size"]),
         )
         log_merged_model(base_model_id, current_accuracy, current_accuracy)
         merged_state_dict = deepcopy(base_model.state_dict())
@@ -140,6 +144,7 @@ def main(cfg: DictConfig):
                 model.id,
                 output_dir=model_eval_dir,
                 eval_runs=cfg.eval_runs,
+                batch_size=int(cfg["batch_size"]),
             )
             min_current_accuracy = float(cfg.get("min_current_accuracy", 0.0))
             if current_accuracy < min_current_accuracy:
@@ -162,6 +167,7 @@ def main(cfg: DictConfig):
                 "merged_model",
                 output_dir=merged_eval_dir,
                 eval_runs=cfg.eval_runs,
+                batch_size=int(cfg["batch_size"]),
             )
         else:
             merged_accuracy = None
@@ -322,7 +328,7 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, output_dir, eval_runs=1):
+def evaluate(model_id, output_dir, eval_runs=1, batch_size=32):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
@@ -356,18 +362,19 @@ def evaluate(model_id, output_dir, eval_runs=1):
     for run_idx in range(eval_runs):
         print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_id}")
 
-        subprocess.run(
-            [
-                "opencompass",
-                "eval_llama.py",
-                "--work-dir",
-                output_dir,
-                "--max-num-worker",
-                str(num_gpus),
-            ],
-            env={"CUDA_VISIBLE_DEVICES": cuda_devices, **os.environ},
-            check=True,
-        )
+        with setup_unique_config(output_dir, batch_size) as eval_config_path:
+            subprocess.run(
+                [
+                    "opencompass",
+                    str(eval_config_path),
+                    "--work-dir",
+                    output_dir,
+                    "--max-num-worker",
+                    str(num_gpus),
+                ],
+                env={"CUDA_VISIBLE_DEVICES": cuda_devices, **os.environ},
+                check=True,
+            )
 
         latest_dir = get_latest_subdir(output_dir)
         accuracy = get_accuracy(latest_dir)
@@ -376,6 +383,28 @@ def evaluate(model_id, output_dir, eval_runs=1):
 
     mean_accuracy = sum(accuracies) / len(accuracies)
     return mean_accuracy
+
+
+@contextmanager
+def setup_unique_config(parent_dir: Path, batch_size: int):
+    """Create a unique temporary OpenCompass config and yield its path.
+
+    The temporary directory and file are deleted when the context exits.
+    """
+    template_path = TOP_DIR / "eval_llama.py"
+    template_text = template_path.read_text()
+    replaced_text = template_text.replace(
+        "max_batch_size=None", f"max_batch_size={batch_size}"
+    ).replace("batch_size=None", f"batch_size={batch_size}")
+
+    tmp_dir = Path(tempfile.mkdtemp(dir=str(parent_dir), prefix="merge-"))
+    try:
+        timestamp = int(time.time() * 1000000)
+        eval_config_path = tmp_dir / f"eval_llama_{timestamp}.py"
+        eval_config_path.write_text(replaced_text)
+        yield eval_config_path
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def get_latest_subdir(parent_dir):

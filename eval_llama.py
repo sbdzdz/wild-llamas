@@ -28,11 +28,11 @@ models = [
         type=TurboMindModelwithChatTemplate,
         abbr="eval_model",
         path="models/eval_model",
-        engine_config=dict(max_batch_size=16, tp=1),
+        engine_config=dict(max_batch_size=None, tp=1),  # overwrite via hydra
         gen_config=dict(temperature=0.9, top_k=20, top_p=0.8, max_new_tokens=2048),
         max_seq_len=8192,
         max_out_len=2048,
-        batch_size=16,
+        batch_size=None,  # overwrite via hydra
         run_cfg=dict(num_gpus=1),
         stop_words=["<|end_of_text|>", "<|eot_id|>"],
     )

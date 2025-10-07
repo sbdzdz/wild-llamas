@@ -6,6 +6,7 @@ eval_every_n_merges: 50
 evaluate_current: false
 min_current_accuracy: 50.0
 eval_runs: 3
+batch_size: 32
 
 hydra:
   run:
