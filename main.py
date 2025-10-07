@@ -275,7 +275,12 @@ def is_text_generation(model):
 
 def is_approx_8b_params(model):
     """Return True if model.safetensors.total (param count) is approximately 8B."""
-    return 7_000_000_000 <= int(model.safetensors.total) <= 9_000_000_000
+    if model.safetensors is None:
+        return False
+    if "total" not in model.safetensors.keys():
+        return False
+    else:
+        return 7_000_000_000 <= int(model.safetensors.total) <= 9_000_000_000
 
 
 def are_nearly_equal(sd1, sd2):
