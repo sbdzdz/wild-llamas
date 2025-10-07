@@ -226,12 +226,14 @@ def load_merged_models():
 def fetch_or_load_models(api, base_model_id):
     """Fetch model list from API or load from all_models.csv for consistent ordering."""
     model_ids = load_all_models()
-    models = api.list_models(
-        filter=f"base_model:finetune:{base_model_id}",
-        sort="downloads",
-        direction=-1,
-        gated=False,
-        expand=["safetensors", "pipeline_tag"],
+    models = list(
+        api.list_models(
+            filter=f"base_model:finetune:{base_model_id}",
+            sort="downloads",
+            direction=-1,
+            gated=False,
+            expand=["safetensors", "pipeline_tag"],
+        )
     )
     if model_ids is None:
         print("Fetching model list from HuggingFace API...")
