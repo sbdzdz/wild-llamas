@@ -189,11 +189,6 @@ def load_current_models_stats(output_dir):
                 continue
 
             mean_accuracy, std_accuracy = compute_run_aggregate_mean_std(cat_df)
-            num_runs = cat_df["run"].nunique()
-            print(
-                f"[plot-current] model={model_id} dataset={prefix} runs={num_runs} "
-                f"mean={mean_accuracy:.3f} std={std_accuracy:.3f}"
-            )
             stats_by_category[prefix].append(
                 {"mean": mean_accuracy, "std": std_accuracy}
             )
