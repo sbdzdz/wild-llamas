@@ -171,11 +171,8 @@ def load_current_models_stats(output_dir):
     stats_by_category = {info["prefix"]: [] for info in DATASETS.values()}
 
     for model_id in model_ids:
-        model_dir = models_root / model_id
-        try:
-            df = get_individual_accuracies(model_dir)
-        except Exception:
-            continue
+        model_dir = models_root / model_id.replace("/", "--")
+        df = get_individual_accuracies(model_dir)
 
         for category_info in DATASETS.values():
             prefix = category_info["prefix"]
