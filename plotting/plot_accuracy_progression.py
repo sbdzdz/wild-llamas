@@ -52,7 +52,7 @@ def plot_accuracy_per_dataset(output_dir, ylim=None, plot_current=False):
             overlay_current_checkpoints(
                 category_info=dataset_info,
                 current_models_stats=current_models_stats,
-                x_value=steps[0],
+                steps=steps,
             )
             plt.legend(fontsize=11)
 
@@ -98,8 +98,12 @@ def compute_run_aggregate_mean_std(df):
     return float(mean_accuracy), float(std_accuracy)
 
 
-def overlay_current_checkpoints(category_info, current_models_stats, x_value):
-    """Overlay orange markers and std rectangles for current checkpoints on the plot."""
+def overlay_current_checkpoints(category_info, current_models_stats, steps):
+    """Overlay orange markers and std rectangles for current checkpoints on the plot.
+
+    Each model is plotted at its step index according to merge_log order.
+    Base model (index 0) is skipped; first fine-tuned model is at steps[1].
+    """
     prefix = category_info["prefix"]
     entries = current_models_stats.get(prefix, [])
     if not entries:
@@ -113,7 +117,10 @@ def overlay_current_checkpoints(category_info, current_models_stats, x_value):
     rounding_size = rect_width * 0.5
 
     first = True
-    for entry in entries:
+    for idx, entry in enumerate(entries, start=1):
+        if idx >= len(steps):
+            break
+        x_value = steps[idx]
         mean = entry["mean"]
         std = entry["std"]
 
