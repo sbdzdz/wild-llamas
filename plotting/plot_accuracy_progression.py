@@ -201,7 +201,6 @@ def plot_accuracy(
     accuracies,
     stds=None,
     ylim=None,
-    show_annotations=True,
 ):
     """Plot accuracy data for a single category."""
     plt.figure(figsize=(10, 6))
@@ -271,23 +270,6 @@ def plot_accuracy(
 
     if ylim is not None:
         plt.ylim(ylim)
-
-    if show_annotations:
-        annotation_step = max(1, len(valid_steps) // 10) if len(valid_steps) > 20 else 1
-
-        for i, (step, acc) in enumerate(zip(valid_steps, valid_accuracies)):
-            if i == 0 or i % annotation_step == 0:
-                is_base = i == 0
-                plt.annotate(
-                    f"{acc:.1f}",
-                    (step, acc),
-                    textcoords="offset points",
-                    xytext=(-10, -15) if is_base else (-5, 8),
-                    ha="center",
-                    fontsize=8,
-                    color=base_color if is_base else merged_color,
-                    fontweight="bold" if is_base else "normal",
-                )
 
 
 def load_summary_data(output_dir):
