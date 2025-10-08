@@ -166,7 +166,7 @@ def load_current_models_stats(output_dir):
         return {}
     model_ids = model_ids[1:]
 
-    models_root = opencompass_root.parent / "models"
+    models_root = opencompass_root / "models"
 
     stats_by_category = {info["prefix"]: [] for info in DATASETS.values()}
 
