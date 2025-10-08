@@ -284,9 +284,9 @@ def is_text_generation(model):
 def is_approx_8b_params(model):
     """Return True if model.safetensors.total (param count) is approximately 8B."""
     if model.safetensors is None:
-        return False
+        return True
     if "total" not in model.safetensors.keys():
-        return False
+        return True
     else:
         return 7_000_000_000 <= int(model.safetensors.total) <= 9_000_000_000
 
