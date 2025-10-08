@@ -54,6 +54,7 @@ def plot_accuracy_per_dataset(output_dir, ylim=None, plot_current=False):
                 current_models_stats=current_models_stats,
                 x_value=steps[0],
             )
+            plt.legend(fontsize=11)
 
         plt.title(
             f"{dataset_info['display_name']} Accuracy",
@@ -322,28 +323,22 @@ def get_individual_accuracies(work_dir):
     Returns raw run data to allow proper statistical aggregation at the category level.
     """
     step_dir = Path(work_dir)
-    subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
-
-    if len(subdirs) == 0:
-        raise RuntimeError(f"No evaluation directories found in {work_dir}")
-
     all_run_data = []
 
+    subdirs = [d for d in step_dir.iterdir() if d.is_dir()]
     for subdir in subdirs:
         summary_dir = subdir / "summary"
         if not summary_dir.exists():
             continue
-
         csv_files = list(summary_dir.glob("*.csv"))
         if not csv_files:
             continue
-
         csv_file = csv_files[0]
         df = pd.read_csv(csv_file)
         df = df.rename(columns={"eval_model": "accuracy"})
         df["accuracy"] = pd.to_numeric(df["accuracy"].replace("-", 0), errors="coerce")
         df = df[["dataset", "accuracy"]]
-        df["run"] = subdir.name  # Add run identifier
+        df["run"] = subdir.name
         all_run_data.append(df)
 
     if not all_run_data:
