@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import argparse
+from matplotlib.patches import FancyBboxPatch
 
-DATASET_CATEGORIES = {
+DATASETS = {
     "mmlu": {
         "prefix": "lukaemon_mmlu_",
         "display_name": "MMLU",
@@ -26,60 +27,43 @@ DATASET_CATEGORIES = {
 }
 
 
-def plot_accuracy_progression(output_dir, ylim=None):
-    """Create the accuracy progression plot.
-
-    Args:
-        output_dir: Path to the OpenCompass output directory containing evaluation results
-        ylim: Optional tuple of (ymin, ymax) for y-axis limits
-    """
-    create_category_plots(output_dir, ylim)
-
-
-def create_category_plots(output_dir, ylim=None):
-    """Create separate plots for each dataset category."""
+def plot_accuracy_per_dataset(output_dir, ylim=None, plot_current=False):
+    """Create separate plots for each dataset."""
     df = load_summary_data(output_dir)
     figures_dir = (Path(__file__) / "../../figures").resolve()
     figures_dir.mkdir(exist_ok=True)
 
-    for category_info in DATASET_CATEGORIES.values():
-        if category_info["prefix"] in ["GPQA_diamond", "math-500"]:
-            category_df = df[df["dataset"] == category_info["prefix"]]
-        else:
-            category_df = df[df["dataset"].str.startswith(category_info["prefix"])]
+    current_models_stats = None
+    if plot_current:
+        current_models_stats = load_current_models_stats(output_dir)
 
-        if category_df.empty:
-            print(f"No data found for {category_info['display_name']}")
+    for dataset_info in DATASETS.values():
+        dataset_df = df[df["dataset"].str.startswith(dataset_info["prefix"])]
+
+        if dataset_df.empty:
+            print(f"No data found for {dataset_info['display_name']}")
             continue
 
-        # Proper statistical aggregation: first average per run, then compute statistics
-        steps = []
-        accuracies = []
-        stds = []
+        steps, accuracies, stds = compute_step_series(dataset_df)
 
-        for step in sorted(category_df["step"].unique()):
-            step_data = category_df[category_df["step"] == step]
+        plot_accuracy(steps, accuracies, stds, ylim=ylim)
 
-            run_averages = step_data.groupby("run")["accuracy"].mean()
-
-            mean_accuracy = run_averages.mean()
-            std_accuracy = run_averages.std() if len(run_averages) > 1 else 0.0
-
-            steps.append(step)
-            accuracies.append(mean_accuracy)
-            stds.append(std_accuracy)
-
-        plot_single_category_accuracy(steps, accuracies, stds, ylim=ylim)
+        if plot_current and current_models_stats is not None:
+            overlay_current_checkpoints(
+                category_info=dataset_info,
+                current_models_stats=current_models_stats,
+                x_value=steps[0],
+            )
 
         plt.title(
-            f"{category_info['display_name']} Accuracy",
+            f"{dataset_info['display_name']} Accuracy",
             fontsize=14,
             fontweight="bold",
         )
 
         plt.tight_layout()
         filename = (
-            f"accuracy_{category_info['display_name'].replace(' ', '_').lower()}.png"
+            f"accuracy_{dataset_info['display_name'].replace(' ', '_').lower()}.png"
         )
         output_path = figures_dir / filename
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
@@ -88,7 +72,126 @@ def create_category_plots(output_dir, ylim=None):
         print(f"Saved: {output_path.relative_to(figures_dir.parent)}")
 
 
-def plot_single_category_accuracy(
+def compute_step_series(dataset_df):
+    """Compute step-wise arrays of steps, means, stds for a dataset df."""
+    steps = []
+    means = []
+    stds = []
+    for step in sorted(dataset_df["step"].unique()):
+        step_data = dataset_df[dataset_df["step"] == step]
+        mean_accuracy, std_accuracy = compute_run_aggregate_mean_std(step_data)
+        steps.append(step)
+        means.append(mean_accuracy)
+        stds.append(std_accuracy)
+    return steps, means, stds
+
+
+def compute_run_aggregate_mean_std(df):
+    """Compute mean and std over per-run means for an accuracy dataframe.
+
+    Groups by run, averages per run, then returns (mean_of_runs, std_of_runs).
+    """
+    run_averages = df.groupby("run")["accuracy"].mean()
+    mean_accuracy = run_averages.mean()
+    std_accuracy = run_averages.std() if len(run_averages) > 1 else 0.0
+    return float(mean_accuracy), float(std_accuracy)
+
+
+def overlay_current_checkpoints(category_info, current_models_stats, x_value):
+    """Overlay orange markers and std rectangles for current checkpoints on the plot."""
+    prefix = category_info["prefix"]
+    entries = current_models_stats.get(prefix, [])
+    if not entries:
+        return
+
+    ax = plt.gca()
+    orange = "#ff7f0e"
+    marker_size = 35
+
+    rect_width = 0.6
+    rounding_size = rect_width * 0.5
+
+    first = True
+    for entry in entries:
+        mean = entry["mean"]
+        std = entry["std"]
+
+        plt.scatter(
+            [x_value],
+            [mean],
+            s=marker_size,
+            color=orange,
+            alpha=0.9,
+            zorder=3,
+            edgecolor="none",
+            label="Fine-tuned checkpoints" if first else None,
+        )
+        first = False
+
+        if std > 0:
+            x0 = x_value - rect_width / 2.0
+            y0 = mean - std
+            rect = FancyBboxPatch(
+                (x0, y0),
+                rect_width,
+                std * 2.0,
+                boxstyle=f"round,pad=0,rounding_size={rounding_size}",
+                linewidth=0,
+                facecolor=orange,
+                edgecolor=None,
+                alpha=0.2,
+                zorder=2,
+            )
+            ax.add_patch(rect)
+
+
+def load_current_models_stats(output_dir):
+    """Load fine-tuned model stats per category from merge_log and model outputs.
+
+    Returns a dict keyed by category prefix mapping to a list of dicts with
+    keys {"mean", "std"} for each model (excluding the base model).
+    """
+    opencompass_root = Path(output_dir)
+    merge_log_path = opencompass_root / "merge_log.csv"
+    if not merge_log_path.exists():
+        raise RuntimeError(f"merge_log.csv not found at {merge_log_path}")
+
+    df_log = pd.read_csv(merge_log_path)
+    if "model_id" not in df_log.columns:
+        raise RuntimeError("merge_log.csv must contain a 'model_id' column")
+
+    model_ids = [m for m in df_log["model_id"].tolist() if isinstance(m, str)]
+    if len(model_ids) <= 1:
+        return {}
+    model_ids = model_ids[1:]
+
+    models_root = opencompass_root.parent / "models"
+
+    stats_by_category = {info["prefix"]: [] for info in DATASETS.values()}
+
+    for model_id in model_ids:
+        model_dir = models_root / model_id
+        try:
+            df = get_individual_accuracies(model_dir)
+        except Exception:
+            continue
+
+        for category_info in DATASETS.values():
+            prefix = category_info["prefix"]
+            cat_df = df[df["dataset"].str.startswith(prefix)]
+
+            if cat_df.empty:
+                continue
+
+            mean_accuracy, std_accuracy = compute_run_aggregate_mean_std(cat_df)
+            stats_by_category[prefix].append(
+                {"mean": mean_accuracy, "std": std_accuracy}
+            )
+
+    return stats_by_category
+
+
+def plot_accuracy(
     steps,
     accuracies,
     stds=None,
@@ -270,9 +373,16 @@ def main():
         metavar=("YMIN", "YMAX"),
         help="Set y-axis limits, e.g. --ylim 0 100",
     )
+    parser.add_argument(
+        "--plot-current",
+        action="store_true",
+        help="Also plot individual fine-tuned checkpoints from outputs/models",
+    )
     args = parser.parse_args()
     ylim = tuple(args.ylim) if args.ylim is not None else None
-    plot_accuracy_progression(output_dir=args.output_dir, ylim=ylim)
+    plot_accuracy_per_dataset(
+        output_dir=args.output_dir, ylim=ylim, plot_current=args.plot_current
+    )
 
 
 if __name__ == "__main__":
