@@ -1,10 +1,10 @@
-base_model: "meta-llama/Llama-3.1-8B-Instruct"
+base_model: "Qwen/Qwen2.5-7B-Instruct"
 output_dir: "outputs/opencompass"
-model_limit: 250
+model_limit: 300
 model_dir: null
-eval_every_n_merges: 50
-evaluate_current: false
-min_current_accuracy: 50.0
+eval_every_n_merges: 1
+evaluate_current: true
+min_current_accuracy: 20.0
 eval_runs: 3
 batch_size: 32
 
