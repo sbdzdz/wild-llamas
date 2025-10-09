@@ -393,7 +393,7 @@ def setup_unique_config(parent_dir: Path, batch_size: int):
 
     The temporary directory and file are deleted when the context exits.
     """
-    template_path = TOP_DIR / "eval_llama.py"
+    template_path = TOP_DIR / "eval.py"
     template_text = template_path.read_text()
     replaced_text = template_text.replace(
         "max_batch_size=None", f"max_batch_size={batch_size}"
@@ -402,7 +402,7 @@ def setup_unique_config(parent_dir: Path, batch_size: int):
     tmp_dir = Path(tempfile.mkdtemp(dir=str(parent_dir), prefix="merge-"))
     try:
         timestamp = int(time.time() * 1000000)
-        eval_config_path = tmp_dir / f"eval_llama_{timestamp}.py"
+        eval_config_path = tmp_dir / f"eval_{timestamp}.py"
         eval_config_path.write_text(replaced_text)
         yield eval_config_path
     finally:
