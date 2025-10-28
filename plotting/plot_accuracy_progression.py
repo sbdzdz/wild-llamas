@@ -33,6 +33,8 @@ def plot_accuracy_per_dataset(output_dir, ylim=None, plot_current=False):
     figures_dir = (Path(__file__) / "../../figures").resolve()
     figures_dir.mkdir(exist_ok=True)
 
+    output_dir_name = Path(output_dir).name
+
     current_models_stats = None
     if plot_current:
         current_models_stats = load_current_models_stats(output_dir)
@@ -63,9 +65,8 @@ def plot_accuracy_per_dataset(output_dir, ylim=None, plot_current=False):
         )
 
         plt.tight_layout()
-        filename = (
-            f"accuracy_{dataset_info['display_name'].replace(' ', '_').lower()}.png"
-        )
+        dataset_name = dataset_info["display_name"].replace(" ", "_").lower()
+        filename = f"{output_dir_name}_{dataset_name}.png"
         output_path = figures_dir / filename
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         plt.close()
