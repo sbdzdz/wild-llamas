@@ -22,7 +22,7 @@ from huggingface_hub import HfApi, snapshot_download
 from omegaconf import DictConfig
 from transformers import AutoModelForCausalLM
 
-from merge import create_merge_instance
+from wildllamas.merge import create_merge_instance
 
 TOP_DIR = Path(__file__).parent
 

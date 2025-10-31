@@ -13,7 +13,23 @@ To install the dependencies for this project:
    uv sync --frozen
    ```
 
+   Or install the package in editable mode:
+
+   ```bash
+   uv pip install -e .
+   ```
+
 This will set up your virtual environment with all required packages.
+
+### Optional Dependencies
+
+**lmdeploy**: Required for running model evaluation.
+
+To install with lmdeploy support:
+
+```bash
+uv pip install -e ".[lmdeploy]"
+```
 
 ## Usage
 

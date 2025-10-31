@@ -8,7 +8,7 @@ def create_merge_instance(cfg: DictConfig):
     """Creates and returns an instance of the merge class based on the provided configuration."""
     method_to_class = {
         "weight_averaging": WeightAveraging,
-        "weight_averaging_running": WeightAveragingRunning,
+        "weight_averaging_running": WeightAveragingIncremental,
         "task_arithmetic": TaskArithmetic,
         "ties": TIES,
     }
@@ -49,6 +49,26 @@ class BaseMerge(ABC):
         return [
             {k: v.cpu() for k, v in state_dict.items()} for state_dict in state_dicts
         ]
+
+
+class BaseIncrementalMerge(ABC):
+    """Abstract base class for incremental merging methods that update state incrementally."""
+
+    def __init__(self):
+        self._step_count = 0
+
+    @abstractmethod
+    def update(self, new_state_dict):
+        """Update the internal state with a new state dictionary."""
+        raise NotImplementedError("Update method not implemented.")
+
+    @property
+    def step_count(self):
+        return self._step_count
+
+    @step_count.setter
+    def step_count(self, value):
+        self._step_count = value
 
 
 class BaseTaskVectorMerge(BaseMerge):
@@ -114,13 +134,13 @@ class WeightAveraging(BaseMerge):
         }
 
 
-class WeightAveragingRunning:
-    """Running weight averaging technique that maintains the average of all state dictionaries seen so far."""
+class WeightAveragingIncremental(BaseIncrementalMerge):
+    """Incremental weight averaging technique that maintains the average of all state dictionaries seen so far."""
 
     def __init__(self):
         """Initialize with an initial state dictionary."""
+        super().__init__()
         self.current_average = None
-        self.step_count = 0
 
     def validate_state_dict(self, state_dict):
         """Check if the state dictionary has the same keys as the current average."""
@@ -152,14 +172,6 @@ class WeightAveragingRunning:
 
         self.step_count += 1
         return self.current_average
-
-    @property
-    def step_count(self):
-        return self._step_count
-
-    @step_count.setter
-    def step_count(self, value):
-        self._step_count = value
 
 
 class TaskArithmetic(BaseTaskVectorMerge):
