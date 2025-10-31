@@ -79,7 +79,7 @@ def main(cfg: DictConfig):
         )
         base_eval_dir = opencompass_root / "merged_model" / "step_0"
         current_accuracy = evaluate(
-            base_model_id,
+            base_model_path,
             base_eval_dir,
             cfg.eval_runs,
             batch_size=int(cfg["batch_size"]),
@@ -139,9 +139,10 @@ def main(cfg: DictConfig):
 
         if cfg.evaluate_current:
             model_name = model.id.replace("/", "--")
+            model_path = TOP_DIR / f"models/{model_name}"
             model_eval_dir = opencompass_root / f"models/{model_name}"
             current_accuracy = evaluate(
-                model.id,
+                model_path,
                 output_dir=model_eval_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
@@ -164,7 +165,7 @@ def main(cfg: DictConfig):
         ):
             merged_eval_dir = opencompass_root / "merged_model" / f"step_{merging_step}"
             merged_accuracy = evaluate(
-                "merged_model",
+                merged_model_path,
                 output_dir=merged_eval_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
@@ -330,20 +331,21 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_id, output_dir, eval_runs=1, batch_size=32):
+def evaluate(model_path, output_dir, eval_runs=1, batch_size=32):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
-        model_id: The model ID (e.g., "meta-llama/Llama-3.1-8B-Instruct" or path like "models/merged_model")
+        model_path: Path to the model directory
         output_dir: Absolute output directory path
         eval_runs: Number of evaluation runs to perform
+        batch_size: Batch size for evaluation
 
     Returns:
         float: Mean accuracy across all evaluation runs
     """
-    model_name = model_id.replace("/", "--")
-    model_path = TOP_DIR / f"models/{model_name}"
+    model_path = Path(model_path)
     output_dir = Path(output_dir)
+    model_name = model_path.name
 
     if output_dir.exists():
         subdirs = [d for d in output_dir.iterdir() if d.is_dir()]
@@ -353,7 +355,6 @@ def evaluate(model_id, output_dir, eval_runs=1, batch_size=32):
             mean_accuracy = sum(accuracies) / len(accuracies)
             return mean_accuracy
 
-    set_eval_model_symlink(model_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     num_gpus = torch.cuda.device_count()
@@ -362,9 +363,9 @@ def evaluate(model_id, output_dir, eval_runs=1, batch_size=32):
     accuracies = []
 
     for run_idx in range(eval_runs):
-        print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_id}")
+        print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_name}")
 
-        with setup_unique_config(output_dir, batch_size) as eval_config_path:
+        with setup_unique_config(output_dir, batch_size, model_path) as eval_config_path:
             subprocess.run(
                 [
                     "opencompass",
@@ -388,16 +389,23 @@ def evaluate(model_id, output_dir, eval_runs=1, batch_size=32):
 
 
 @contextmanager
-def setup_unique_config(parent_dir: Path, batch_size: int):
+def setup_unique_config(parent_dir: Path, batch_size: int, model_path: Path):
     """Create a unique temporary OpenCompass config and yield its path.
+
+    Args:
+        parent_dir: Parent directory for temporary config
+        batch_size: Batch size for evaluation
+        model_path: Path to model directory
 
     The temporary directory and file are deleted when the context exits.
     """
     template_path = TOP_DIR / "eval.py"
     template_text = template_path.read_text()
-    replaced_text = template_text.replace(
-        "max_batch_size=None", f"max_batch_size={batch_size}"
-    ).replace("batch_size=None", f"batch_size={batch_size}")
+    replaced_text = (
+        template_text.replace("max_batch_size=None", f"max_batch_size={batch_size}")
+        .replace("batch_size=None", f"batch_size={batch_size}")
+        .replace('path="models/eval_model"', f'path="{model_path}"')
+    )
 
     tmp_dir = Path(tempfile.mkdtemp(dir=str(parent_dir), prefix="merge-"))
     try:
@@ -425,14 +433,6 @@ def get_latest_subdir(parent_dir):
         )
         if d.is_dir()
     )
-
-
-def set_eval_model_symlink(target):
-    symlink_path = TOP_DIR / "models/eval_model"
-    if symlink_path.is_symlink() or symlink_path.exists():
-        symlink_path.unlink()
-    target_abs = Path(target).resolve()
-    symlink_path.symlink_to(target_abs)
 
 
 def get_accuracy(timestamp_dir):
