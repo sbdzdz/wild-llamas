@@ -10,3 +10,5 @@ figures/old/
 .cache/
 
 *.out
+
+figures/
