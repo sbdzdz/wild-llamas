@@ -9,6 +9,7 @@ def create_merge_instance(cfg: DictConfig):
     method_to_class = {
         "weight_averaging": WeightAveraging,
         "weight_averaging_running": WeightAveragingIncremental,
+        "ema": EMAIncremental,
         "task_arithmetic": TaskArithmetic,
         "ties": TIES,
     }
@@ -165,10 +166,59 @@ class WeightAveragingIncremental(BaseIncrementalMerge):
             current_avg = self.current_average[key]
             new_value = new_state_dict[key]
 
-            # incremental update
             self.current_average[key] = current_avg + (new_value - current_avg) / (
                 self.step_count + 1
             )
+
+        self.step_count += 1
+        return self.current_average
+
+
+class EMAIncremental(BaseIncrementalMerge):
+    """Exponential moving average incremental merging technique."""
+
+    def __init__(self, beta=0.9):
+        """Initialize with beta parameter for EMA.
+
+        Args:
+            beta: Decay factor for exponential moving average (0 < beta < 1).
+                  Higher values give more weight to previous states.
+        """
+        super().__init__()
+        self.beta = beta
+        self.current_average = None
+
+    def validate_state_dict(self, state_dict):
+        """Check if the state dictionary has the same keys as the current average."""
+        if self.current_average is not None:
+            keys = set(self.current_average.keys())
+            if set(state_dict.keys()) != keys:
+                raise ValueError("Cannot merge state dictionaries with unequal keys.")
+
+    def update(self, new_state_dict):
+        """Update using exponential moving average.
+
+        Args:
+            new_state_dict: New state dictionary to incorporate.
+
+        Returns:
+            Updated averaged state dictionary.
+        """
+        if self.current_average is None:
+            self.current_average = deepcopy(new_state_dict)
+            self.step_count = 1
+            return self.current_average
+
+        self.validate_state_dict(new_state_dict)
+
+        new_state_dict = {k: v.cpu() for k, v in new_state_dict.items()}
+        self.current_average = {k: v.cpu() for k, v in self.current_average.items()}
+
+        for key in self.current_average.keys():
+            current_value = self.current_average[key]
+            new_value = new_state_dict[key]
+
+            self.current_average[key] = self.beta * current_value + (1 - self.beta) * new_value
 
         self.step_count += 1
         return self.current_average

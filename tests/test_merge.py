@@ -1,6 +1,6 @@
 import torch
 import pytest
-from wildllamas.merge import WeightAveraging, WeightAveragingIncremental
+from wildllamas.merge import WeightAveraging, WeightAveragingIncremental, EMAIncremental
 
 
 def create_random_state_dict(num_params=3, param_size=(10, 10), seed=None):
@@ -112,9 +112,101 @@ def test_weight_averaging_incremental_validation():
     print("✓ Validation correctly rejects mismatched keys")
 
 
+def test_ema_incremental_basic():
+    """Test basic EMA incremental merging functionality."""
+    beta = 0.9
+    ema_merger = EMAIncremental(beta=beta)
+
+    state_dict_1 = create_random_state_dict(num_params=2, param_size=(5, 5), seed=0)
+    result_1 = ema_merger.update(state_dict_1)
+
+    for key in state_dict_1.keys():
+        assert torch.allclose(result_1[key], state_dict_1[key]), \
+            f"First update should be identical to input for key {key}"
+
+    assert ema_merger.step_count == 1
+
+    state_dict_2 = create_random_state_dict(num_params=2, param_size=(5, 5), seed=1)
+    result_2 = ema_merger.update(state_dict_2)
+
+    for key in state_dict_1.keys():
+        expected = beta * state_dict_1[key] + (1 - beta) * state_dict_2[key]
+        assert torch.allclose(result_2[key], expected, rtol=1e-5, atol=1e-7), \
+            f"EMA formula not applied correctly for key {key}"
+
+    assert ema_merger.step_count == 2
+
+    print(f"✓ EMA incremental basic functionality works correctly with beta={beta}")
+
+
+def test_ema_incremental_multiple_updates():
+    """Test EMA with multiple sequential updates."""
+    beta = 0.8
+    ema_merger = EMAIncremental(beta=beta)
+
+    state_dicts = [
+        create_random_state_dict(num_params=2, param_size=(3, 3), seed=i)
+        for i in range(5)
+    ]
+
+    current = None
+    for i, state_dict in enumerate(state_dicts):
+        result = ema_merger.update(state_dict)
+
+        if i == 0:
+            current = {k: v.clone() for k, v in result.items()}
+        else:
+            expected = {k: beta * current[k] + (1 - beta) * state_dict[k] for k in state_dict.keys()}
+            for key in state_dict.keys():
+                assert torch.allclose(result[key], expected[key], rtol=1e-5, atol=1e-7), \
+                    f"EMA formula mismatch at update {i+1} for key {key}"
+            current = expected
+
+        assert ema_merger.step_count == i + 1
+
+    print(f"✓ EMA incremental with {len(state_dicts)} updates works correctly")
+
+
+def test_ema_incremental_different_betas():
+    """Test EMA with different beta values."""
+    state_dicts = [
+        create_random_state_dict(num_params=2, param_size=(3, 3), seed=i)
+        for i in range(3)
+    ]
+
+    for beta in [0.5, 0.9, 0.99]:
+        ema_merger = EMAIncremental(beta=beta)
+
+        for state_dict in state_dicts:
+            ema_merger.update(state_dict)
+
+        assert ema_merger.step_count == len(state_dicts)
+
+    print("✓ EMA incremental works with different beta values")
+
+
+def test_ema_incremental_validation():
+    """Test that EMA merger validates state dict keys."""
+    ema_merger = EMAIncremental(beta=0.9)
+
+    state_dict_1 = create_random_state_dict(num_params=3, seed=0)
+    ema_merger.update(state_dict_1)
+
+    state_dict_2 = create_random_state_dict(num_params=2, seed=1)
+
+    with pytest.raises(ValueError, match="Cannot merge state dictionaries with unequal keys"):
+        ema_merger.update(state_dict_2)
+
+    print("✓ EMA validation correctly rejects mismatched keys")
+
+
 if __name__ == "__main__":
     test_weight_averaging_incremental_vs_batch()
     test_weight_averaging_incremental_different_sizes()
     test_weight_averaging_incremental_step_count()
     test_weight_averaging_incremental_validation()
+    test_ema_incremental_basic()
+    test_ema_incremental_multiple_updates()
+    test_ema_incremental_different_betas()
+    test_ema_incremental_validation()
     print("\n✓ All tests passed!")
