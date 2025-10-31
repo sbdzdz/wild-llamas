@@ -31,34 +31,28 @@ def test_weight_averaging_incremental_vs_batch():
     and compares the result to incrementally merging them one-by-one using
     WeightAveragingIncremental.
     """
-    # Create test state dictionaries
     num_models = 5
     state_dicts = [
         create_random_state_dict(num_params=3, param_size=(10, 10), seed=i)
         for i in range(num_models)
     ]
 
-    # Batch merge using WeightAveraging
     batch_merger = WeightAveraging()
     batch_result = batch_merger.merge(state_dicts)
 
-    # Incremental merge using WeightAveragingIncremental
     incremental_merger = WeightAveragingIncremental()
     for state_dict in state_dicts:
         incremental_result = incremental_merger.update(state_dict)
 
-    # Verify step count
     assert incremental_merger.step_count == num_models, \
         f"Expected step_count to be {num_models}, got {incremental_merger.step_count}"
 
-    # Compare results - they should be identical
     for key in batch_result.keys():
         assert key in incremental_result, f"Key {key} missing in incremental result"
 
         batch_tensor = batch_result[key]
         incremental_tensor = incremental_result[key]
 
-        # Check that tensors are close (accounting for floating point precision)
         assert torch.allclose(batch_tensor, incremental_tensor, rtol=1e-5, atol=1e-7), \
             f"Mismatch in parameter {key}: max diff = {(batch_tensor - incremental_tensor).abs().max()}"
 
@@ -107,12 +101,10 @@ def test_weight_averaging_incremental_validation():
     """Test that incremental merger validates state dict keys."""
     incremental_merger = WeightAveragingIncremental()
 
-    # First state dict
     state_dict_1 = create_random_state_dict(num_params=3, seed=0)
     incremental_merger.update(state_dict_1)
 
-    # Second state dict with different keys should raise an error
-    state_dict_2 = create_random_state_dict(num_params=2, seed=1)  # Different number of params
+    state_dict_2 = create_random_state_dict(num_params=2, seed=1)
 
     with pytest.raises(ValueError, match="Cannot merge state dictionaries with unequal keys"):
         incremental_merger.update(state_dict_2)
@@ -121,7 +113,6 @@ def test_weight_averaging_incremental_validation():
 
 
 if __name__ == "__main__":
-    # Run tests
     test_weight_averaging_incremental_vs_batch()
     test_weight_averaging_incremental_different_sizes()
     test_weight_averaging_incremental_step_count()
