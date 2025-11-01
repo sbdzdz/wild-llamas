@@ -42,7 +42,6 @@ def main(cfg: DictConfig):
     setup_model_directory(cfg)
 
     skipped_models = load_skipped_models()
-    merged_models = load_merged_models()
     models = fetch_or_load_models(api, base_model_id)
 
     base_model_path = download(base_model_id)
@@ -52,46 +51,37 @@ def main(cfg: DictConfig):
     )
     base_state_dict = base_model.state_dict()
 
-    merged_model_path = TOP_DIR / "models/merged_model"
+    merged_model_path = opencompass_root / "merged_model"
 
-    resume = merged_model_path.exists()
-
-    if resume:
-        merged_model = AutoModelForCausalLM.from_pretrained(
-            merged_model_path, device_map="cpu", trust_remote_code=True
-        )
-        merged_state_dict = merged_model.state_dict()
-        base_model.load_state_dict(merged_state_dict)
-        merging_step = len([m for m in merged_models if m != base_model_id])
-        print(f"Resuming from merging step {merging_step}")
-    else:
-        shutil.copytree(
-            base_model_path,
-            merged_model_path,
-            ignore=shutil.ignore_patterns(
-                ".cache",
-                "*.lock",
-                "*.safetensors",
-                "model.safetensors.index.json",
-                "pytorch_model.bin",
-                ".gitattributes",
-            ),
-        )
-        base_eval_dir = opencompass_root / "merged_model" / "step_0"
-        current_accuracy = evaluate(
-            base_model_path,
-            base_eval_dir,
-            cfg.eval_runs,
-            batch_size=int(cfg["batch_size"]),
-        )
-        log_merged_model(base_model_id, current_accuracy, current_accuracy)
-        merged_state_dict = deepcopy(base_model.state_dict())
-        merging_step = 0
-        print("Starting from scratch")
+    shutil.copytree(
+        base_model_path,
+        merged_model_path,
+        ignore=shutil.ignore_patterns(
+            ".cache",
+            "*.lock",
+            "*.safetensors",
+            "model.safetensors.index.json",
+            "pytorch_model.bin",
+            ".gitattributes",
+        ),
+    )
+    base_eval_dir = opencompass_root / "merged_model" / "step_0"
+    current_accuracy = evaluate(
+        base_model_path,
+        base_eval_dir,
+        cfg.eval_runs,
+        batch_size=int(cfg["batch_size"]),
+    )
+    log_merged_model(
+        opencompass_root, base_model_id, current_accuracy, current_accuracy
+    )
+    merged_state_dict = deepcopy(base_model.state_dict())
+    merging_step = 0
 
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
-    merger.step_count = merging_step + 1
+
+    overwrite_skipped = cfg.get("overwrite_skipped", False)
 
     for model in models:
         gc.collect()
@@ -101,40 +91,36 @@ def main(cfg: DictConfig):
             print(f"Skipping {model.id} (previously skipped)")
             continue
 
-        if resume and model.id in merged_models:
-            print(f"Skipping {model.id} (already merged)")
-            continue
-
         if not is_approx_8b_params(model):
-            log_skipped_model(model.id, "not_8b")
+            log_skipped_model(model.id, "not_8b", overwrite_skipped)
             continue
 
         if not is_bf16(model):
-            log_skipped_model(model.id, "not_bf16")
+            log_skipped_model(model.id, "not_bf16", overwrite_skipped)
             continue
 
         if not is_text_generation(model):
-            log_skipped_model(model.id, "not_text")
+            log_skipped_model(model.id, "not_text", overwrite_skipped)
             continue
 
         try:
             download(model.id)
         except Exception:
-            log_skipped_model(model.id, "download_error")
+            log_skipped_model(model.id, "download_error", overwrite_skipped)
             continue
 
         try:
             current_model_state_dict = load(model.id)
         except Exception:
-            log_skipped_model(model.id, "load_error")
+            log_skipped_model(model.id, "load_error", overwrite_skipped)
             continue
 
         if not state_dicts_match(base_state_dict, current_model_state_dict):
-            log_skipped_model(model.id, "dtypes_mismatch")
+            log_skipped_model(model.id, "dtypes_mismatch", overwrite_skipped)
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
-            log_skipped_model(model.id, "nearly_equal")
+            log_skipped_model(model.id, "nearly_equal", overwrite_skipped)
             continue
 
         if cfg.evaluate_current:
@@ -149,7 +135,7 @@ def main(cfg: DictConfig):
             )
             min_current_accuracy = float(cfg.get("min_current_accuracy", 0.0))
             if current_accuracy < min_current_accuracy:
-                log_skipped_model(model.id, "poor_performance")
+                log_skipped_model(model.id, "poor_performance", overwrite_skipped)
                 continue
         else:
             current_accuracy = None
@@ -158,7 +144,7 @@ def main(cfg: DictConfig):
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
-        save(base_model, "merged_model")
+        save(base_model, merged_model_path)
         if (
             merging_step % cfg.eval_every_n_merges == 0
             or merging_step == cfg.model_limit
@@ -173,7 +159,7 @@ def main(cfg: DictConfig):
         else:
             merged_accuracy = None
 
-        log_merged_model(model.id, current_accuracy, merged_accuracy)
+        log_merged_model(opencompass_root, model.id, current_accuracy, merged_accuracy)
 
         if merging_step > cfg.model_limit:
             break
@@ -212,16 +198,6 @@ def load_skipped_models():
 
     df = pd.read_csv(skipped_file)
     return set(df["model_id"].tolist())
-
-
-def load_merged_models():
-    """Load list of model IDs that have been successfully merged from merge_log.csv."""
-    log_file = TOP_DIR / "outputs/merge_log.csv"
-    if not log_file.exists():
-        return []
-
-    df = pd.read_csv(log_file)
-    return df["model_id"].tolist()
 
 
 def fetch_or_load_models(api, base_model_id):
@@ -365,7 +341,9 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32):
     for run_idx in range(eval_runs):
         print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_name}")
 
-        with setup_unique_config(output_dir, batch_size, model_path) as eval_config_path:
+        with setup_unique_config(
+            output_dir, batch_size, model_path
+        ) as eval_config_path:
             subprocess.run(
                 [
                     "opencompass",
@@ -458,18 +436,18 @@ def load(model_id):
     return model.state_dict()
 
 
-def save(model, model_name):
-    """Save the merged model."""
-    model_path = TOP_DIR / f"models/{model_name}"
+def save(model, model_path):
+    """Save the merged model to the specified path."""
+    model_path = Path(model_path)
     model_path.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(model_path)
     print(f"Saved merged model to {model_path}")
 
 
-def log_merged_model(model_id, current_accuracy, merged_accuracy):
+def log_merged_model(output_root, model_id, current_accuracy, merged_accuracy):
     """Log a successful merge to the merge log."""
-    log_file = TOP_DIR / "outputs/merge_log.csv"
-    log_file.parent.mkdir(exist_ok=True)
+    log_file = output_root / "merge_log.csv"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
     if not log_file.exists():
         with open(log_file, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
@@ -481,8 +459,14 @@ def log_merged_model(model_id, current_accuracy, merged_accuracy):
         writer.writerow([model_id, current_acc_value, merged_acc_value])
 
 
-def log_skipped_model(model_id, reason):
-    """Save a skipped model to skipped_models.csv."""
+def log_skipped_model(model_id, reason, overwrite_skipped):
+    """Save a skipped model to skipped_models.csv if overwrite_skipped is True."""
+    if not overwrite_skipped:
+        print(
+            f"Skipping {model_id} ({reason}) - not writing to skipped_models.csv (read-only mode)"
+        )
+        return
+
     skipped_file = TOP_DIR / "skipped_models.csv"
 
     if not skipped_file.exists():
