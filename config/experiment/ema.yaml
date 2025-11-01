@@ -1,0 +1,12 @@
+# @package _global_
+
+# Experiment: Exponential Moving Average (Incremental)
+# Uses EMAIncremental class from wildllamas/merge.py
+
+output_dir: "outputs/experiment/ema"
+
+merge:
+  method: ema
+
+  ema:
+    beta: 0.5
