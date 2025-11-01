@@ -1,3 +1,7 @@
+defaults:
+  - _self_
+  - experiment: weight_averaging
+
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
 output_dir: null
 model_limit: 50
