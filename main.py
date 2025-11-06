@@ -67,6 +67,7 @@ def main(cfg: DictConfig):
         cfg.eval_runs,
         batch_size=int(cfg["batch_size"]),
     )
+    best_merged_accuracy = current_accuracy
     log_merged_model(output_dir, base_model_id, current_accuracy, current_accuracy)
     merged_state_dict = deepcopy(base_model.state_dict())
     merging_step = 0
@@ -133,28 +134,68 @@ def main(cfg: DictConfig):
         else:
             current_accuracy = None
 
+        if cfg.greedy:
+            previous_merged_state_dict = deepcopy(merged_state_dict)
+            previous_step_count = merger.step_count
+
         merging_step += 1
         print(f"Merging {model.id}...")
         merged_state_dict = merger.update(current_model_state_dict)
         base_model.load_state_dict(merged_state_dict)
-        save(base_model, merged_model_path)
-        if (
-            merging_step % cfg.eval_every_n_merges == 0
-            or merging_step == cfg.model_limit
-        ):
-            merged_eval_dir = output_dir / "merged_model" / f"step_{merging_step}"
+
+        if cfg.greedy:
+            save(base_model, merged_model_path)
+            merged_eval_dir = (
+                output_dir / "results/merged_model" / f"step_{merging_step}"
+            )
             merged_accuracy = evaluate(
                 merged_model_path,
                 output_dir=merged_eval_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
             )
+
+            if merged_accuracy < best_merged_accuracy:
+                print(
+                    f"Merge rejected: accuracy decreased from {best_merged_accuracy:.2f} to {merged_accuracy:.2f}"
+                )
+                merged_state_dict = previous_merged_state_dict
+                merger.current_average = deepcopy(previous_merged_state_dict)
+                merger.step_count = previous_step_count
+                merging_step -= 1
+                base_model.load_state_dict(merged_state_dict)
+                save(base_model, merged_model_path)
+                log_skipped_model(model.id, "greedy_rejected", overwrite_skipped)
+                continue
+            else:
+                print(
+                    f"Merge accepted: accuracy {best_merged_accuracy:.2f} -> {merged_accuracy:.2f}"
+                )
+                best_merged_accuracy = merged_accuracy
+                log_merged_model(
+                    output_dir, model.id, current_accuracy, merged_accuracy
+                )
         else:
-            merged_accuracy = None
+            save(base_model, merged_model_path)
+            if (
+                merging_step % cfg.eval_every_n_merges == 0
+                or merging_step == cfg.model_limit
+            ):
+                merged_eval_dir = (
+                    output_dir / "results/merged_model" / f"step_{merging_step}"
+                )
+                merged_accuracy = evaluate(
+                    merged_model_path,
+                    output_dir=merged_eval_dir,
+                    eval_runs=cfg.eval_runs,
+                    batch_size=int(cfg["batch_size"]),
+                )
+            else:
+                merged_accuracy = None
 
-        log_merged_model(output_dir, model.id, current_accuracy, merged_accuracy)
+            log_merged_model(output_dir, model.id, current_accuracy, merged_accuracy)
 
-        if merging_step > cfg.model_limit:
+        if merging_step >= cfg.model_limit:
             break
 
 
