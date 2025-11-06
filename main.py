@@ -32,12 +32,9 @@ def main(cfg: DictConfig):
     api = HfApi()
     base_model_id = cfg.base_model
 
-    configured_root = Path(cfg.get("output_dir", "outputs/opencompass"))
-    opencompass_root = (
-        configured_root
-        if configured_root.is_absolute()
-        else (TOP_DIR / configured_root)
-    )
+    output_dir = Path(cfg.get("output_dir", "outputs/opencompass"))
+    output_dir = output_dir if output_dir.is_absolute() else (TOP_DIR / output_dir)
+    output_dir.mkdir(exist_ok=True, parents=True)
 
     setup_model_directory(cfg)
 
@@ -45,13 +42,11 @@ def main(cfg: DictConfig):
     models = fetch_or_load_models(api, base_model_id)
 
     base_model_path = download(base_model_id)
-
     base_model = AutoModelForCausalLM.from_pretrained(
         base_model_path, device_map="cpu", trust_remote_code=True
     )
     base_state_dict = base_model.state_dict()
-
-    merged_model_path = opencompass_root / "merged_model"
+    merged_model_path = output_dir / "merged_model"
 
     shutil.copytree(
         base_model_path,
@@ -65,16 +60,14 @@ def main(cfg: DictConfig):
             ".gitattributes",
         ),
     )
-    base_eval_dir = opencompass_root / "merged_model" / "step_0"
+    base_eval_dir = output_dir / "results/merged_model/step_0"
     current_accuracy = evaluate(
         base_model_path,
         base_eval_dir,
         cfg.eval_runs,
         batch_size=int(cfg["batch_size"]),
     )
-    log_merged_model(
-        opencompass_root, base_model_id, current_accuracy, current_accuracy
-    )
+    log_merged_model(output_dir, base_model_id, current_accuracy, current_accuracy)
     merged_state_dict = deepcopy(base_model.state_dict())
     merging_step = 0
 
@@ -126,7 +119,7 @@ def main(cfg: DictConfig):
         if cfg.evaluate_current:
             model_name = model.id.replace("/", "--")
             model_path = TOP_DIR / f"models/{model_name}"
-            model_eval_dir = opencompass_root / f"models/{model_name}"
+            model_eval_dir = output_dir / f"results/current/{model_name}"
             current_accuracy = evaluate(
                 model_path,
                 output_dir=model_eval_dir,
@@ -149,7 +142,7 @@ def main(cfg: DictConfig):
             merging_step % cfg.eval_every_n_merges == 0
             or merging_step == cfg.model_limit
         ):
-            merged_eval_dir = opencompass_root / "merged_model" / f"step_{merging_step}"
+            merged_eval_dir = output_dir / "merged_model" / f"step_{merging_step}"
             merged_accuracy = evaluate(
                 merged_model_path,
                 output_dir=merged_eval_dir,
@@ -159,7 +152,7 @@ def main(cfg: DictConfig):
         else:
             merged_accuracy = None
 
-        log_merged_model(opencompass_root, model.id, current_accuracy, merged_accuracy)
+        log_merged_model(output_dir, model.id, current_accuracy, merged_accuracy)
 
         if merging_step > cfg.model_limit:
             break
