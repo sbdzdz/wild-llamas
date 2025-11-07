@@ -367,6 +367,9 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True)
             mean_accuracy = sum(accuracies) / len(accuracies)
             return mean_accuracy
 
+    if not use_cache and output_dir.exists():
+        shutil.rmtree(output_dir)
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     num_gpus = torch.cuda.device_count()
