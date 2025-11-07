@@ -170,7 +170,7 @@ def main(cfg: DictConfig):
                 continue
             else:
                 print(
-                    f"Merge accepted: accuracy {best_merged_accuracy:.2f} -> {merged_accuracy:.2f}"
+                    f"Merge accepted: accuracy increased from {best_merged_accuracy:.2f} to {merged_accuracy:.2f}"
                 )
                 best_merged_accuracy = merged_accuracy
                 log_merged_model(
