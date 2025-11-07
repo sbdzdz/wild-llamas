@@ -153,6 +153,7 @@ def main(cfg: DictConfig):
                 output_dir=merged_eval_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
+                use_cache=False,
             )
 
             if merged_accuracy < best_merged_accuracy:
@@ -341,7 +342,7 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_path, output_dir, eval_runs=1, batch_size=32):
+def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
@@ -349,6 +350,7 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32):
         output_dir: Absolute output directory path
         eval_runs: Number of evaluation runs to perform
         batch_size: Batch size for evaluation
+        use_cache: Whether to use cached results if available
 
     Returns:
         float: Mean accuracy across all evaluation runs
@@ -357,7 +359,7 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32):
     output_dir = Path(output_dir)
     model_name = model_path.name
 
-    if output_dir.exists():
+    if use_cache and output_dir.exists():
         subdirs = [d for d in output_dir.iterdir() if d.is_dir()]
         if len(subdirs) == eval_runs:
             print(f"Using existing evaluation results at {output_dir}")
