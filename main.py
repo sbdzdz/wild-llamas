@@ -156,7 +156,7 @@ def main(cfg: DictConfig):
                 use_cache=False,
             )
 
-            if merged_accuracy < best_merged_accuracy:
+            if merged_accuracy <= best_merged_accuracy:
                 print(
                     f"Merge rejected: accuracy decreased from {best_merged_accuracy:.2f} to {merged_accuracy:.2f}"
                 )
