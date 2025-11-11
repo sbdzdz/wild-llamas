@@ -66,6 +66,7 @@ def main(cfg: DictConfig):
         base_eval_dir,
         cfg.eval_runs,
         batch_size=int(cfg["batch_size"]),
+        datasets=cfg.datasets,
     )
     best_merged_accuracy = current_accuracy
     log_merged_model(output_dir, base_model_id, current_accuracy, current_accuracy)
@@ -126,6 +127,7 @@ def main(cfg: DictConfig):
                 output_dir=model_eval_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
+                datasets=cfg.datasets,
             )
             min_current_accuracy = float(cfg.get("min_current_accuracy", 0.0))
             if current_accuracy < min_current_accuracy:
@@ -154,6 +156,7 @@ def main(cfg: DictConfig):
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
                 use_cache=False,
+                datasets=cfg.datasets,
             )
 
             if merged_accuracy <= best_merged_accuracy:
@@ -190,6 +193,7 @@ def main(cfg: DictConfig):
                     output_dir=merged_eval_dir,
                     eval_runs=cfg.eval_runs,
                     batch_size=int(cfg["batch_size"]),
+                    datasets=cfg.datasets,
                 )
             else:
                 merged_accuracy = None
@@ -342,7 +346,7 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True):
+def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True, datasets=None):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
@@ -351,10 +355,13 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True)
         eval_runs: Number of evaluation runs to perform
         batch_size: Batch size for evaluation
         use_cache: Whether to use cached results if available
+        datasets: List of dataset names to evaluate on
 
     Returns:
         float: Mean accuracy across all evaluation runs
     """
+    if datasets is None:
+        datasets = []
     model_path = Path(model_path)
     output_dir = Path(output_dir)
     model_name = model_path.name
@@ -381,7 +388,7 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True)
         print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_name}")
 
         with setup_unique_config(
-            output_dir, batch_size, model_path
+            output_dir, batch_size, model_path, datasets
         ) as eval_config_path:
             subprocess.run(
                 [
@@ -406,22 +413,39 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True)
 
 
 @contextmanager
-def setup_unique_config(parent_dir: Path, batch_size: int, model_path: Path):
+def setup_unique_config(parent_dir: Path, batch_size: int, model_path: Path, datasets: list):
     """Create a unique temporary OpenCompass config and yield its path.
 
     Args:
         parent_dir: Parent directory for temporary config
         batch_size: Batch size for evaluation
         model_path: Path to model directory
+        datasets: List of dataset names to include
 
     The temporary directory and file are deleted when the context exits.
     """
+    # Map human-friendly names to dataset variable names
+    dataset_mapping = {
+        "mmlu": "mmlu_datasets",
+        "mmlu_pro": "mmlu_pro_datasets",
+        "math500": "math_datasets",
+        "gpqa": "gpqa_datasets",
+    }
+
+    # Generate datasets line
+    dataset_vars = [dataset_mapping[name] for name in datasets if name in dataset_mapping]
+    if dataset_vars:
+        datasets_line = f"datasets = [{', '.join(f'*{var}' for var in dataset_vars)}]"
+    else:
+        datasets_line = "datasets = []"
+
     template_path = TOP_DIR / "eval.py"
     template_text = template_path.read_text()
     replaced_text = (
         template_text.replace("max_batch_size=None", f"max_batch_size={batch_size}")
         .replace("batch_size=None", f"batch_size={batch_size}")
         .replace('path="models/eval_model"', f'path="{model_path}"')
+        .replace("datasets = []", datasets_line)
     )
 
     tmp_dir = Path(tempfile.mkdtemp(dir=str(parent_dir), prefix="merge-"))

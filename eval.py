@@ -16,12 +16,7 @@ api_meta_template = dict(
     reserved_roles=[dict(role="SYSTEM", api_role="SYSTEM")],
 )
 
-datasets = [
-    *mmlu_datasets,
-    *mmlu_pro_datasets,
-    *math_datasets,
-    *gpqa_datasets,
-]
+datasets = []
 
 models = [
     dict(

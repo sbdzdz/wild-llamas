@@ -13,6 +13,11 @@ greedy: false
 eval_runs: 3
 batch_size: 32
 overwrite_skipped: false
+datasets:
+  - mmlu
+  - mmlu_pro
+  - math500
+  - gpqa
 
 hydra:
   run:
