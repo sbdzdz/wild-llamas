@@ -4,13 +4,13 @@ defaults:
 
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
 output_dir: null
-model_limit: 50
+model_limit: 1000
 model_dir: null
 eval_every_n_merges: 1
 evaluate_current: false
 min_current_accuracy: 20.0
 greedy: false
-eval_runs: 3
+eval_runs: 5
 batch_size: 32
 overwrite_skipped: false
 datasets:
