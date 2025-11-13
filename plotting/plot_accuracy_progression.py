@@ -174,7 +174,7 @@ def load_current_models_stats(output_dir):
         return {}
     model_ids = model_ids[1:]
 
-    models_root = opencompass_root / "models"
+    models_root = opencompass_root / "results/current"
 
     stats_by_category = {info["prefix"]: [] for info in DATASETS.values()}
 
@@ -280,7 +280,7 @@ def load_summary_data(output_dir):
         output_dir: Path to the OpenCompass output directory containing evaluation results
     """
     opencompass_root = Path(output_dir)
-    merged_model_dir = opencompass_root / "merged_model"
+    merged_model_dir = opencompass_root / "results/merged_model"
     step_dirs = sorted(
         [d for d in merged_model_dir.iterdir() if d.name.startswith("step_")]
     )
