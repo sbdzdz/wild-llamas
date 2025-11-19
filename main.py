@@ -118,13 +118,13 @@ def main(cfg: DictConfig):
             log_skipped_model(model.id, "nearly_equal", overwrite_skipped)
             continue
 
-        if cfg.evaluate_current:
-            model_name = model.id.replace("/", "--")
-            model_path = TOP_DIR / f"models/{model_name}"
-            model_eval_dir = output_dir / f"results/current/{model_name}"
+        # In greedy mode, skip current model evaluation until we know if merge is accepted
+        current_accuracy = None
+        if not cfg.greedy and cfg.evaluate_current:
+            model_path, model_output_dir = set_up_eval_paths(model.id, output_dir)
             current_accuracy = evaluate(
                 model_path,
-                output_dir=model_eval_dir,
+                output_dir=model_output_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
                 datasets=cfg.datasets,
@@ -133,8 +133,6 @@ def main(cfg: DictConfig):
             if current_accuracy < min_current_accuracy:
                 log_skipped_model(model.id, "poor_performance", overwrite_skipped)
                 continue
-        else:
-            current_accuracy = None
 
         if cfg.greedy:
             previous_merged_state_dict = deepcopy(merged_state_dict)
@@ -176,6 +174,19 @@ def main(cfg: DictConfig):
                     f"Merge accepted: accuracy increased from {best_merged_accuracy:.2f} to {merged_accuracy:.2f}"
                 )
                 best_merged_accuracy = merged_accuracy
+
+                if cfg.evaluate_current:
+                    model_path, model_output_dir = set_up_eval_paths(
+                        model.id, output_dir
+                    )
+                    current_accuracy = evaluate(
+                        model_path,
+                        output_dir=model_output_dir,
+                        eval_runs=cfg.eval_runs,
+                        batch_size=int(cfg["batch_size"]),
+                        datasets=cfg.datasets,
+                    )
+
                 log_merged_model(
                     output_dir, model.id, current_accuracy, merged_accuracy
                 )
@@ -202,6 +213,14 @@ def main(cfg: DictConfig):
 
         if merging_step >= cfg.model_limit:
             break
+
+
+def set_up_eval_paths(model_id: str, output_root: Path) -> tuple[Path, Path]:
+    """Return (model_path, eval_output_dir) for a given model_id."""
+    model_name = model_id.replace("/", "--")
+    model_path = TOP_DIR / f"models/{model_name}"
+    model_eval_dir = output_root / f"results/current/{model_name}"
+    return model_path, model_eval_dir
 
 
 def setup_model_directory(cfg: DictConfig):
@@ -346,7 +365,9 @@ def download(model_id):
     return model_path
 
 
-def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True, datasets=None):
+def evaluate(
+    model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True, datasets=None
+):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
@@ -413,7 +434,9 @@ def evaluate(model_path, output_dir, eval_runs=1, batch_size=32, use_cache=True,
 
 
 @contextmanager
-def setup_unique_config(parent_dir: Path, batch_size: int, model_path: Path, datasets: list):
+def setup_unique_config(
+    parent_dir: Path, batch_size: int, model_path: Path, datasets: list
+):
     """Create a unique temporary OpenCompass config and yield its path.
 
     Args:
@@ -433,7 +456,9 @@ def setup_unique_config(parent_dir: Path, batch_size: int, model_path: Path, dat
     }
 
     # Generate datasets line
-    dataset_vars = [dataset_mapping[name] for name in datasets if name in dataset_mapping]
+    dataset_vars = [
+        dataset_mapping[name] for name in datasets if name in dataset_mapping
+    ]
     if dataset_vars:
         datasets_line = f"datasets = [{', '.join(f'*{var}' for var in dataset_vars)}]"
     else:
