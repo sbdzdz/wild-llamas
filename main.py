@@ -534,28 +534,21 @@ def setup_unique_config(
     else:
         datasets_line = "datasets = []"
 
-    # Add percentage slicing logic if specified
-    percentage_logic = ""
-    if dataset_percentage is not None and dataset_percentage != 100:
-        percentage_logic = f"""
-# Apply percentage-based sampling for greedy evaluation
-for ds in datasets:
-    if 'reader_cfg' not in ds:
-        ds['reader_cfg'] = {{'input_columns': ['input'], 'output_column': 'target'}}
-    if 'test_split' in ds['reader_cfg']:
-        original_split = ds['reader_cfg']['test_split']
-        ds['reader_cfg']['test_split'] = f"{{original_split}}[:{dataset_percentage}%]"
-    else:
-        ds['reader_cfg']['test_split'] = 'test[:{dataset_percentage}%]'
-"""
+    dataset_fraction_literal = (
+        dataset_percentage / 100
+        if (dataset_percentage is not None and dataset_percentage != 100)
+        else "None"
+    )
 
     template_path = TOP_DIR / "eval.py"
     template_text = template_path.read_text()
     replaced_text = (
-        template_text.replace("max_batch_size=None", f"max_batch_size={batch_size}")
-        .replace("batch_size=None", f"batch_size={batch_size}")
+        template_text.replace("BATCH_SIZE = None", f"BATCH_SIZE = {batch_size}")
         .replace('path="models/eval_model"', f'path="{model_path}"')
-        .replace("datasets = []", datasets_line + percentage_logic)
+        .replace("datasets = []", datasets_line)
+        .replace(
+            "DATASET_FRACTION = None", f"DATASET_FRACTION = {dataset_fraction_literal}"
+        )
     )
 
     tmp_dir = Path(tempfile.mkdtemp(dir=str(parent_dir), prefix="merge-"))
