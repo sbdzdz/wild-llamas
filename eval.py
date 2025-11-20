@@ -14,7 +14,7 @@ datasets = []  # Populated at runtime
 if DATASET_FRACTION is not None:
     for d in datasets:
         d.setdefault("reader_cfg", {})
-        d["reader_cfg"].update({"test_range": f"[0:{DATASET_FRACTION}]"})
+        d["reader_cfg"].update({"test_range": DATASET_FRACTION})
 
 api_meta_template = dict(
     round=[
