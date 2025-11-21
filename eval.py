@@ -8,13 +8,13 @@ with read_base():
     from opencompass.configs.datasets.gpqa.gpqa_gen import gpqa_datasets
 
 BATCH_SIZE = None  # Replaced at runtime for evaluation batch size
-DATASET_FRACTION = None  # Replaced at runtime for partial evaluations
+NUM_EVAL_SAMPLES = None  # Replaced at runtime for partial evaluations
 datasets = []  # Populated at runtime
 
-if DATASET_FRACTION is not None:
+if NUM_EVAL_SAMPLES is not None:
     for d in datasets:
         d.setdefault("reader_cfg", {})
-        d["reader_cfg"].update({"test_range": DATASET_FRACTION})
+        d["reader_cfg"].update({"test_range": f"[0:{NUM_EVAL_SAMPLES}]"})
 
 api_meta_template = dict(
     round=[

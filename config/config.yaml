@@ -10,7 +10,7 @@ eval_every_n_merges: 1
 evaluate_current: false
 min_current_accuracy: 20.0
 greedy: false
-greedy_eval_percentage: 10
+greedy_eval_samples: null
 eval_runs: 5
 batch_size: 32
 overwrite_skipped: false

@@ -75,7 +75,7 @@ def main(cfg: DictConfig):
         current_accuracy=current_accuracy,
         merged_accuracy_partial="",
         merged_accuracy_full=current_accuracy,
-        eval_percentage=100,
+        num_eval_samples=None,
     )
     merged_state_dict = deepcopy(base_model.state_dict())
     merging_step = 0
@@ -153,8 +153,7 @@ def main(cfg: DictConfig):
         if cfg.greedy:
             save(base_model, merged_model_path)
 
-            # Evaluate for acceptance decision (partial or full based on greedy_eval_percentage)
-            greedy_eval_percentage = cfg.get("greedy_eval_percentage")
+            greedy_eval_samples = cfg.get("greedy_eval_samples")
             merged_eval_dir = (
                 output_dir / "results/merged_model" / f"step_{merging_step}"
             )
@@ -165,7 +164,7 @@ def main(cfg: DictConfig):
                 batch_size=int(cfg["batch_size"]),
                 use_cache=False,
                 datasets=cfg.datasets,
-                dataset_percentage=greedy_eval_percentage,
+                num_eval_samples=greedy_eval_samples,
             )
 
             if merged_accuracy_partial <= best_merged_accuracy:
@@ -186,7 +185,7 @@ def main(cfg: DictConfig):
                 )
                 best_merged_accuracy = merged_accuracy_partial
 
-                if greedy_eval_percentage is None or greedy_eval_percentage == 100:
+                if greedy_eval_samples is None:
                     merged_accuracy_full = merged_accuracy_partial
                 elif merging_step % cfg.eval_every_n_merges == 0:
                     print(f"Performing full evaluation at step {merging_step}")
@@ -200,7 +199,7 @@ def main(cfg: DictConfig):
                         batch_size=int(cfg["batch_size"]),
                         use_cache=False,
                         datasets=cfg.datasets,
-                        dataset_percentage=None,
+                        num_eval_samples=None,
                     )
                 else:
                     merged_accuracy_full = None
@@ -223,9 +222,7 @@ def main(cfg: DictConfig):
                     current_accuracy=current_accuracy,
                     merged_accuracy_partial=merged_accuracy_partial,
                     merged_accuracy_full=merged_accuracy_full,
-                    eval_percentage=greedy_eval_percentage
-                    if greedy_eval_percentage is not None
-                    else 100,
+                    num_eval_samples=greedy_eval_samples,
                 )
         else:
             save(base_model, merged_model_path)
@@ -252,7 +249,7 @@ def main(cfg: DictConfig):
                 current_accuracy=current_accuracy,
                 merged_accuracy_partial="",
                 merged_accuracy_full=merged_accuracy,
-                eval_percentage=100,
+                num_eval_samples=None,
             )
 
         if merging_step >= cfg.model_limit:
@@ -416,18 +413,18 @@ def evaluate(
     batch_size=32,
     use_cache=True,
     datasets=None,
-    dataset_percentage=None,
+    num_eval_samples=None,
 ):
     """Evaluate a model and return its mean accuracy across multiple runs.
 
     Args:
         model_path: Path to the model directory
-        output_dir: Absolute output directory path (will be modified based on dataset_percentage)
+        output_dir: Absolute output directory path (will be modified based on num_eval_samples)
         eval_runs: Number of evaluation runs to perform
         batch_size: Batch size for evaluation
         use_cache: Whether to use cached results if available
         datasets: List of dataset names to evaluate on
-        dataset_percentage: Percentage of samples to use from each dataset (1-100), None for full dataset
+        num_eval_samples: Number of samples to use from each dataset during evaluation, None for full dataset
 
     Returns:
         float: Mean accuracy across all evaluation runs
@@ -438,7 +435,7 @@ def evaluate(
     output_dir = Path(output_dir)
 
     # Adjust output directory if using partial evaluation
-    if dataset_percentage is not None and dataset_percentage != 100:
+    if num_eval_samples is not None:
         parts = output_dir.parts
         if len(parts) >= 2 and parts[-2].startswith("merged_model"):
             output_dir = output_dir.parent.parent / f"{parts[-2]}_partial" / parts[-1]
@@ -467,7 +464,7 @@ def evaluate(
         print(f"Running evaluation {run_idx + 1}/{eval_runs} for {model_name}")
 
         with setup_unique_config(
-            output_dir, batch_size, model_path, datasets, dataset_percentage
+            output_dir, batch_size, model_path, datasets, num_eval_samples
         ) as eval_config_path:
             subprocess.run(
                 [
@@ -497,7 +494,7 @@ def setup_unique_config(
     batch_size: int,
     model_path: Path,
     datasets: list,
-    dataset_percentage: int = None,
+    num_eval_samples: int | None = None,
 ):
     """Create a unique temporary OpenCompass config and yield its path.
 
@@ -506,16 +503,12 @@ def setup_unique_config(
         batch_size: Batch size for evaluation
         model_path: Path to model directory
         datasets: List of dataset names to include
-        dataset_percentage: Percentage of samples to use from each dataset (1-100), None for full dataset
+        num_eval_samples: Number of samples to use from each dataset, None for full dataset
 
     The temporary directory and file are deleted when the context exits.
     """
-    if dataset_percentage is not None and (
-        dataset_percentage <= 0 or dataset_percentage > 100
-    ):
-        raise ValueError(
-            f"dataset_percentage must be between 1 and 100, got {dataset_percentage}"
-        )
+    if num_eval_samples is not None and num_eval_samples <= 0:
+        raise ValueError(f"num_eval_samples must be positive, got {num_eval_samples}")
 
     # Map human-friendly names to dataset variable names
     dataset_mapping = {
@@ -534,10 +527,8 @@ def setup_unique_config(
     else:
         datasets_line = "datasets = []"
 
-    dataset_fraction_literal = (
-        dataset_percentage / 100
-        if (dataset_percentage is not None and dataset_percentage != 100)
-        else "None"
+    num_eval_samples_literal = (
+        num_eval_samples if num_eval_samples is not None else "None"
     )
 
     template_path = TOP_DIR / "eval.py"
@@ -547,7 +538,8 @@ def setup_unique_config(
         .replace('path="models/eval_model"', f'path="{model_path}"')
         .replace("datasets = []", datasets_line)
         .replace(
-            "DATASET_FRACTION = None", f"DATASET_FRACTION = {dataset_fraction_literal}"
+            "NUM_EVAL_SAMPLES = None",
+            f"NUM_EVAL_SAMPLES = {num_eval_samples_literal}",
         )
     )
 
@@ -616,7 +608,7 @@ def log_merged_model(
     current_accuracy,
     merged_accuracy_partial,
     merged_accuracy_full,
-    eval_percentage,
+    num_eval_samples,
 ):
     """Log a successful merge to the merge log with partial/full accuracy columns."""
     log_file = output_root / "merge_log.csv"
@@ -630,7 +622,7 @@ def log_merged_model(
                     "current_accuracy",
                     "merged_accuracy_partial",
                     "merged_accuracy_full",
-                    "eval_percentage",
+                    "num_eval_samples",
                 ]
             )
     with open(log_file, "a", newline="") as csvfile:
@@ -642,14 +634,14 @@ def log_merged_model(
         merged_full_value = (
             merged_accuracy_full if merged_accuracy_full is not None else ""
         )
-        eval_pct_value = eval_percentage if eval_percentage is not None else ""
+        num_eval_samples = num_eval_samples if num_eval_samples is not None else ""
         writer.writerow(
             [
                 model_id,
                 current_acc_value,
                 merged_partial_value,
                 merged_full_value,
-                eval_pct_value,
+                num_eval_samples,
             ]
         )
 
