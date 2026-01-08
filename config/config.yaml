@@ -11,7 +11,7 @@ evaluate_current: false
 min_current_accuracy: 20.0
 greedy: false
 greedy_eval_samples: 100
-eval_runs: 5
+eval_runs: 3
 batch_size: 32
 datasets:
   - mmlu
