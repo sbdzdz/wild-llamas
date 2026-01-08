@@ -677,7 +677,7 @@ def merge_skipped_models(output_root):
         global_df = pd.DataFrame(columns=["model_id", "reason"])
 
     combined = pd.concat([global_df, run_df], ignore_index=True)
-    combined = combined.drop_duplicates(subset=["model_id"], keep="first")
+    combined = combined.drop_duplicates(subset=["model_id"], keep="last")
     combined.to_csv(global_skipped_file, index=False)
 
 
