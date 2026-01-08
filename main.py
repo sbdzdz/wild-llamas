@@ -171,6 +171,8 @@ def main(cfg: DictConfig):
                 print(
                     f"Merge rejected: accuracy decreased from {best_merged_accuracy:.2f} to {merged_accuracy_partial:.2f}"
                 )
+                if merged_eval_dir.exists():
+                    shutil.rmtree(merged_eval_dir)
                 merged_state_dict = previous_merged_state_dict
                 merger.current_average = deepcopy(previous_merged_state_dict)
                 merger.step_count = previous_step_count
