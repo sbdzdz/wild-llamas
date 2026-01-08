@@ -83,8 +83,6 @@ def main(cfg: DictConfig):
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
 
-    overwrite_skipped = cfg.get("overwrite_skipped", False)
-
     for model in models:
         gc.collect()
         torch.cuda.empty_cache()
@@ -94,35 +92,35 @@ def main(cfg: DictConfig):
             continue
 
         if not is_approx_8b_params(model):
-            log_skipped_model(model.id, "not_8b", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "not_8b")
             continue
 
         if not is_bf16(model):
-            log_skipped_model(model.id, "not_bf16", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "not_bf16")
             continue
 
         if not is_text_generation(model):
-            log_skipped_model(model.id, "not_text", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "not_text")
             continue
 
         try:
             download(model.id)
         except Exception:
-            log_skipped_model(model.id, "download_error", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "download_error")
             continue
 
         try:
             current_model_state_dict = load(model.id)
         except Exception:
-            log_skipped_model(model.id, "load_error", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "load_error")
             continue
 
         if not state_dicts_match(base_state_dict, current_model_state_dict):
-            log_skipped_model(model.id, "dtypes_mismatch", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "dtypes_mismatch")
             continue
 
         if are_nearly_equal(base_state_dict, current_model_state_dict):
-            log_skipped_model(model.id, "nearly_equal", overwrite_skipped)
+            log_skipped_model(output_dir, model.id, "nearly_equal")
             continue
 
         # In greedy mode, skip current model evaluation until we know if merge is accepted
@@ -138,7 +136,7 @@ def main(cfg: DictConfig):
             )
             min_current_accuracy = float(cfg.get("min_current_accuracy", 0.0))
             if current_accuracy < min_current_accuracy:
-                log_skipped_model(model.id, "poor_performance", overwrite_skipped)
+                log_skipped_model(output_dir, model.id, "poor_performance")
                 continue
 
         if cfg.greedy:
@@ -179,7 +177,7 @@ def main(cfg: DictConfig):
                 merging_step -= 1
                 base_model.load_state_dict(merged_state_dict)
                 save(base_model, merged_model_path)
-                log_skipped_model(model.id, "greedy_rejected", overwrite_skipped)
+                log_skipped_model(output_dir, model.id, "greedy_rejected")
                 continue
             else:
                 print(
@@ -256,6 +254,8 @@ def main(cfg: DictConfig):
 
         if merging_step >= cfg.model_limit:
             break
+
+    merge_skipped_models(output_dir)
 
 
 def set_up_eval_paths(model_id: str, output_root: Path) -> tuple[Path, Path]:
@@ -648,22 +648,37 @@ def log_merged_model(
         )
 
 
-def log_skipped_model(model_id, reason, overwrite_skipped):
-    """Save a skipped model to skipped_models.csv if overwrite_skipped is True."""
-    if not overwrite_skipped:
-        print(
-            f"Skipping {model_id} ({reason}) - not writing to skipped_models.csv (read-only mode)"
-        )
-        return
-
-    skipped_file = TOP_DIR / "skipped_models.csv"
+def log_skipped_model(output_root, model_id, reason):
+    """Save a skipped model to the run-local skipped_models.csv inside output_root."""
+    skipped_file = Path(output_root) / "skipped_models.csv"
 
     if not skipped_file.exists():
+        skipped_file.parent.mkdir(parents=True, exist_ok=True)
         skipped_file.write_text("model_id,reason\n")
 
     with skipped_file.open("a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([model_id, reason])
+
+
+def merge_skipped_models(output_root):
+    """Merge run-local skipped_models.csv into the global skipped_models.csv."""
+    run_skipped_file = Path(output_root) / "skipped_models.csv"
+    if not run_skipped_file.exists():
+        return
+
+    global_skipped_file = TOP_DIR / "skipped_models.csv"
+
+    run_df = pd.read_csv(run_skipped_file)
+    run_df = run_df[run_df["reason"] != "greedy_rejected"]
+    if global_skipped_file.exists():
+        global_df = pd.read_csv(global_skipped_file)
+    else:
+        global_df = pd.DataFrame(columns=["model_id", "reason"])
+
+    combined = pd.concat([global_df, run_df], ignore_index=True)
+    combined = combined.drop_duplicates(subset=["model_id"], keep="first")
+    combined.to_csv(global_skipped_file, index=False)
 
 
 if __name__ == "__main__":

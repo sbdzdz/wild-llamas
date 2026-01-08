@@ -13,7 +13,6 @@ greedy: false
 greedy_eval_samples: 100
 eval_runs: 5
 batch_size: 32
-overwrite_skipped: false
 datasets:
   - mmlu
   - mmlu_pro
