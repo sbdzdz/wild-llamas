@@ -4,7 +4,7 @@ defaults:
 
 base_model: "meta-llama/Llama-3.1-8B-Instruct"
 output_dir: null
-model_limit: 1000
+model_limit: 100
 model_dir: null
 eval_every_n_merges: 1
 evaluate_current: false
