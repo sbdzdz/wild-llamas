@@ -6,6 +6,7 @@ with read_base():
     from opencompass.configs.datasets.mmlu_pro.mmlu_pro_gen import mmlu_pro_datasets
     from opencompass.configs.datasets.math.math_500_gen import math_datasets
     from opencompass.configs.datasets.gpqa.gpqa_gen import gpqa_datasets
+    from opencompass.configs.datasets.gsm8k.gsm8k_gen import gsm8k_datasets
 
 BATCH_SIZE = None  # Replaced at runtime for evaluation batch size
 NUM_EVAL_SAMPLES = None  # Replaced at runtime for partial evaluations
