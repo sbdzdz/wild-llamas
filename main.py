@@ -60,9 +60,10 @@ def main(cfg: DictConfig):
             ".gitattributes",
         ),
     )
-    base_eval_dir = output_dir / "results/merged_model/step_0"
     selection_datasets = list(cfg.selection_datasets)
     validation_datasets = list(cfg.get("validation_datasets", []))
+
+    base_eval_dir = output_dir / "results/merged_model/step_0"
     current_accuracy = evaluate(
         base_model_path,
         base_eval_dir,
@@ -164,11 +165,11 @@ def main(cfg: DictConfig):
 
         if cfg.greedy:
             save(base_model, merged_model_path)
-
             greedy_eval_samples = cfg.get("greedy_eval_samples")
             merged_eval_dir = (
                 output_dir / "results/merged_model" / f"step_{merging_step}"
             )
+
             merged_accuracy_partial = evaluate(
                 merged_model_path,
                 output_dir=merged_eval_dir,
@@ -179,6 +180,7 @@ def main(cfg: DictConfig):
                 num_eval_samples=greedy_eval_samples,
             )
 
+            # Reject merge if accuracy didn't improve
             if merged_accuracy_partial <= best_merged_accuracy:
                 print(
                     f"Merge rejected: accuracy decreased from {best_merged_accuracy:.2f} to {merged_accuracy_partial:.2f}"
@@ -193,76 +195,76 @@ def main(cfg: DictConfig):
                 save(base_model, merged_model_path)
                 log_skipped_model(output_dir, model.id, "greedy_rejected")
                 continue
+
+            # Merge accepted
+            print(
+                f"Merge accepted: accuracy increased from {best_merged_accuracy:.2f} to {merged_accuracy_partial:.2f}"
+            )
+            best_merged_accuracy = merged_accuracy_partial
+
+            if greedy_eval_samples is None:
+                merged_accuracy_full = merged_accuracy_partial
+            elif merging_step % cfg.eval_every_n_merges == 0:
+                print(f"Performing full evaluation at step {merging_step}")
+                full_eval_dir = (
+                    output_dir / "results/merged_model" / f"step_{merging_step}"
+                )
+                merged_accuracy_full = evaluate(
+                    merged_model_path,
+                    output_dir=full_eval_dir,
+                    eval_runs=cfg.eval_runs,
+                    batch_size=int(cfg["batch_size"]),
+                    use_cache=False,
+                    datasets=selection_datasets,
+                    num_eval_samples=None,
+                )
             else:
-                print(
-                    f"Merge accepted: accuracy increased from {best_merged_accuracy:.2f} to {merged_accuracy_partial:.2f}"
+                merged_accuracy_full = None
+
+            if validation_datasets:
+                print(f"Performing validation evaluation at step {merging_step}")
+                validation_eval_dir = (
+                    output_dir
+                    / "results/merged_model_validation"
+                    / f"step_{merging_step}"
                 )
-                best_merged_accuracy = merged_accuracy_partial
-
-                if greedy_eval_samples is None:
-                    merged_accuracy_full = merged_accuracy_partial
-                elif merging_step % cfg.eval_every_n_merges == 0:
-                    print(f"Performing full evaluation at step {merging_step}")
-                    full_eval_dir = (
-                        output_dir / "results/merged_model" / f"step_{merging_step}"
-                    )
-                    merged_accuracy_full = evaluate(
-                        merged_model_path,
-                        output_dir=full_eval_dir,
-                        eval_runs=cfg.eval_runs,
-                        batch_size=int(cfg["batch_size"]),
-                        use_cache=False,
-                        datasets=selection_datasets,
-                        num_eval_samples=None,
-                    )
-                else:
-                    merged_accuracy_full = None
-
-                if validation_datasets:
-                    print(f"Performing validation evaluation at step {merging_step}")
-                    validation_eval_dir = (
-                        output_dir
-                        / "results/merged_model_validation"
-                        / f"step_{merging_step}"
-                    )
-                    validation_accuracy = evaluate(
-                        merged_model_path,
-                        output_dir=validation_eval_dir,
-                        eval_runs=cfg.eval_runs,
-                        batch_size=int(cfg["batch_size"]),
-                        use_cache=False,
-                        datasets=validation_datasets,
-                    )
-                else:
-                    validation_accuracy = None
-
-                if cfg.evaluate_current:
-                    model_path, model_output_dir = set_up_eval_paths(
-                        model.id, output_dir
-                    )
-                    current_accuracy = evaluate(
-                        model_path,
-                        output_dir=model_output_dir,
-                        eval_runs=cfg.eval_runs,
-                        batch_size=int(cfg["batch_size"]),
-                        datasets=selection_datasets,
-                    )
-
-                log_merged_model(
-                    output_root=output_dir,
-                    model_id=model.id,
-                    current_accuracy=current_accuracy,
-                    merged_accuracy_partial=merged_accuracy_partial,
-                    merged_accuracy_full=merged_accuracy_full,
-                    validation_accuracy=validation_accuracy,
-                    num_eval_samples=greedy_eval_samples,
+                validation_accuracy = evaluate(
+                    merged_model_path,
+                    output_dir=validation_eval_dir,
+                    eval_runs=cfg.eval_runs,
+                    batch_size=int(cfg["batch_size"]),
+                    use_cache=False,
+                    datasets=validation_datasets,
                 )
+            else:
+                validation_accuracy = None
+
+            if cfg.evaluate_current:
+                model_path, model_output_dir = set_up_eval_paths(model.id, output_dir)
+                current_accuracy = evaluate(
+                    model_path,
+                    output_dir=model_output_dir,
+                    eval_runs=cfg.eval_runs,
+                    batch_size=int(cfg["batch_size"]),
+                    datasets=selection_datasets,
+                )
+
+            log_merged_model(
+                output_root=output_dir,
+                model_id=model.id,
+                current_accuracy=current_accuracy,
+                merged_accuracy_partial=merged_accuracy_partial,
+                merged_accuracy_full=merged_accuracy_full,
+                validation_accuracy=validation_accuracy,
+                num_eval_samples=greedy_eval_samples,
+            )
         else:
             save(base_model, merged_model_path)
-            if (
+            should_eval = (
                 merging_step % cfg.eval_every_n_merges == 0
                 or merging_step == cfg.model_limit
-            ):
+            )
+            if should_eval:
                 merged_eval_dir = (
                     output_dir / "results/merged_model" / f"step_{merging_step}"
                 )
