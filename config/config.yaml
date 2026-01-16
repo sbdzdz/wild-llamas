@@ -13,11 +13,12 @@ greedy: false
 greedy_eval_samples: 100
 eval_runs: 3
 batch_size: 32
-datasets:
+selection_datasets:
   - mmlu
   - mmlu_pro
   - math500
   - gpqa
+validation_datasets: []
 
 hydra:
   run:

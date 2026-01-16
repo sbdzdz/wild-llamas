@@ -61,13 +61,26 @@ def main(cfg: DictConfig):
         ),
     )
     base_eval_dir = output_dir / "results/merged_model/step_0"
+    selection_datasets = list(cfg.selection_datasets)
+    validation_datasets = list(cfg.get("validation_datasets", []))
     current_accuracy = evaluate(
         base_model_path,
         base_eval_dir,
         cfg.eval_runs,
         batch_size=int(cfg["batch_size"]),
-        datasets=cfg.datasets,
+        datasets=selection_datasets,
     )
+    if validation_datasets:
+        base_validation_dir = output_dir / "results/merged_model_validation/step_0"
+        validation_accuracy = evaluate(
+            base_model_path,
+            base_validation_dir,
+            cfg.eval_runs,
+            batch_size=int(cfg["batch_size"]),
+            datasets=validation_datasets,
+        )
+    else:
+        validation_accuracy = None
     best_merged_accuracy = current_accuracy
     log_merged_model(
         output_dir,
@@ -75,6 +88,7 @@ def main(cfg: DictConfig):
         current_accuracy=current_accuracy,
         merged_accuracy_partial="",
         merged_accuracy_full=current_accuracy,
+        validation_accuracy=validation_accuracy,
         num_eval_samples=None,
     )
     merged_state_dict = deepcopy(base_model.state_dict())
@@ -132,7 +146,7 @@ def main(cfg: DictConfig):
                 output_dir=model_output_dir,
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
-                datasets=cfg.datasets,
+                datasets=selection_datasets,
             )
             min_current_accuracy = float(cfg.get("min_current_accuracy", 0.0))
             if current_accuracy < min_current_accuracy:
@@ -161,7 +175,7 @@ def main(cfg: DictConfig):
                 eval_runs=cfg.eval_runs,
                 batch_size=int(cfg["batch_size"]),
                 use_cache=False,
-                datasets=cfg.datasets,
+                datasets=selection_datasets,
                 num_eval_samples=greedy_eval_samples,
             )
 
@@ -198,11 +212,29 @@ def main(cfg: DictConfig):
                         eval_runs=cfg.eval_runs,
                         batch_size=int(cfg["batch_size"]),
                         use_cache=False,
-                        datasets=cfg.datasets,
+                        datasets=selection_datasets,
                         num_eval_samples=None,
                     )
                 else:
                     merged_accuracy_full = None
+
+                if validation_datasets:
+                    print(f"Performing validation evaluation at step {merging_step}")
+                    validation_eval_dir = (
+                        output_dir
+                        / "results/merged_model_validation"
+                        / f"step_{merging_step}"
+                    )
+                    validation_accuracy = evaluate(
+                        merged_model_path,
+                        output_dir=validation_eval_dir,
+                        eval_runs=cfg.eval_runs,
+                        batch_size=int(cfg["batch_size"]),
+                        use_cache=False,
+                        datasets=validation_datasets,
+                    )
+                else:
+                    validation_accuracy = None
 
                 if cfg.evaluate_current:
                     model_path, model_output_dir = set_up_eval_paths(
@@ -213,7 +245,7 @@ def main(cfg: DictConfig):
                         output_dir=model_output_dir,
                         eval_runs=cfg.eval_runs,
                         batch_size=int(cfg["batch_size"]),
-                        datasets=cfg.datasets,
+                        datasets=selection_datasets,
                     )
 
                 log_merged_model(
@@ -222,6 +254,7 @@ def main(cfg: DictConfig):
                     current_accuracy=current_accuracy,
                     merged_accuracy_partial=merged_accuracy_partial,
                     merged_accuracy_full=merged_accuracy_full,
+                    validation_accuracy=validation_accuracy,
                     num_eval_samples=greedy_eval_samples,
                 )
         else:
@@ -238,10 +271,26 @@ def main(cfg: DictConfig):
                     output_dir=merged_eval_dir,
                     eval_runs=cfg.eval_runs,
                     batch_size=int(cfg["batch_size"]),
-                    datasets=cfg.datasets,
+                    datasets=selection_datasets,
                 )
+                if validation_datasets:
+                    validation_eval_dir = (
+                        output_dir
+                        / "results/merged_model_validation"
+                        / f"step_{merging_step}"
+                    )
+                    validation_accuracy = evaluate(
+                        merged_model_path,
+                        output_dir=validation_eval_dir,
+                        eval_runs=cfg.eval_runs,
+                        batch_size=int(cfg["batch_size"]),
+                        datasets=validation_datasets,
+                    )
+                else:
+                    validation_accuracy = None
             else:
                 merged_accuracy = None
+                validation_accuracy = None
 
             log_merged_model(
                 output_root=output_dir,
@@ -249,6 +298,7 @@ def main(cfg: DictConfig):
                 current_accuracy=current_accuracy,
                 merged_accuracy_partial="",
                 merged_accuracy_full=merged_accuracy,
+                validation_accuracy=validation_accuracy,
                 num_eval_samples=None,
             )
 
@@ -518,6 +568,7 @@ def setup_unique_config(
         "mmlu_pro": "mmlu_pro_datasets",
         "math500": "math_datasets",
         "gpqa": "gpqa_datasets",
+        "gsm8k": "gsm8k_datasets",
     }
 
     # Generate datasets line
@@ -610,9 +661,10 @@ def log_merged_model(
     current_accuracy,
     merged_accuracy_partial,
     merged_accuracy_full,
+    validation_accuracy,
     num_eval_samples,
 ):
-    """Log a successful merge to the merge log with partial/full accuracy columns."""
+    """Log a successful merge to the merge log with partial/full/validation accuracy columns."""
     log_file = output_root / "merge_log.csv"
     log_file.parent.mkdir(parents=True, exist_ok=True)
     if not log_file.exists():
@@ -624,6 +676,7 @@ def log_merged_model(
                     "current_accuracy",
                     "merged_accuracy_partial",
                     "merged_accuracy_full",
+                    "validation_accuracy",
                     "num_eval_samples",
                 ]
             )
@@ -636,6 +689,9 @@ def log_merged_model(
         merged_full_value = (
             merged_accuracy_full if merged_accuracy_full is not None else ""
         )
+        validation_value = (
+            validation_accuracy if validation_accuracy is not None else ""
+        )
         num_eval_samples = num_eval_samples if num_eval_samples is not None else ""
         writer.writerow(
             [
@@ -643,6 +699,7 @@ def log_merged_model(
                 current_acc_value,
                 merged_partial_value,
                 merged_full_value,
+                validation_value,
                 num_eval_samples,
             ]
         )
