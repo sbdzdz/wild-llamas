@@ -1,11 +1,7 @@
 sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true output_dir=outputs/ema_greedy
 
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=10 'datasets=[math500]' output_dir=outputs/ema_greedy_math500
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=10 'datasets=[mmlu]' output_dir=outputs/ema_greedy_mmlu
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=10 'datasets=[gpqa]' output_dir=outputs/ema_greedy_gpqa
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=10 'datasets=[mmlu_pro]' output_dir=outputs/ema_greedy_mmlu_pro
+# math
+sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema_holdout 'selection_datasets=[math500]' 'validation_datasets=[gsm8k]' output_dir=outputs/ema_holdout_math
 
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=5 eval_current=true 'datasets=[math500]' output_dir=outputs/ema_greedy_5_math500
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=10 eval_current=true 'datasets=[math500]' output_dir=outputs/ema_greedy_10_math500
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=20 eval_current=true 'datasets=[math500]' output_dir=outputs/ema_greedy_20_math500
-sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema greedy=true eval_runs=2 greedy_eval_samples=50 eval_current=true 'datasets=[math500]' output_dir=outputs/ema_greedy_50_math500
+# knowledge
+sbatch slurm/run_ferranti_multi_gpu.sh experiment=ema_holdout 'selection_datasets=[mmlu]' 'validation_datasets=[mmlu_pro]' output_dir=outputs/ema_holdout_knowledge

@@ -13,9 +13,11 @@ greedy_eval_samples: 200
 
 selection_datasets:
   - math500
+  - mmlu
 
 validation_datasets:
   - gsm8k
+  - mmlu_pro
 
 merge:
   method: ema
