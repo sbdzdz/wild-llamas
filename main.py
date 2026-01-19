@@ -140,7 +140,7 @@ def main(cfg: DictConfig):
 
         # In greedy mode, skip current model evaluation until we know if merge is accepted
         current_accuracy = None
-        if not cfg.greedy and cfg.evaluate_current:
+        if not cfg.greedy and cfg.eval_current:
             model_path, model_output_dir = set_up_eval_paths(model.id, output_dir)
             current_accuracy = evaluate(
                 model_path,
@@ -239,7 +239,7 @@ def main(cfg: DictConfig):
             else:
                 validation_accuracy = None
 
-            if cfg.evaluate_current:
+            if cfg.eval_current:
                 model_path, model_output_dir = set_up_eval_paths(model.id, output_dir)
                 current_accuracy = evaluate(
                     model_path,
