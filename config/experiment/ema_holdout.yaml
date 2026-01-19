@@ -7,16 +7,13 @@
 output_dir: "outputs/experiment/ema_holdout"
 
 greedy: true
-eval_runs: 2
-greedy_eval_samples: 10
+eval_runs: 3
+greedy_eval_samples: 200
 
 selection_datasets:
-  - mmlu
   - math500
 
 validation_datasets:
-  - mmlu_pro
-  - gpqa
   - gsm8k
 
 merge:
