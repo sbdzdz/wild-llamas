@@ -10,6 +10,7 @@ greedy: true
 eval_current: true
 eval_runs: 3
 greedy_eval_samples: 200
+model_limit: 200
 
 selection_datasets:
   - math500
