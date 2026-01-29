@@ -6,8 +6,8 @@ EXPERIMENT_NAME=${1:-"ema_holdout"}
 BETA_VALUES=(0.1 0.3 0.5 0.7 0.9)
 
 # Selection and validation datasets
-SELECTION_DATASETS='[math500,mmlu]'
-VALIDATION_DATASETS='[gsm8k,mmlu_pro]'
+SELECTION_DATASETS='[gsm8k]'
+VALIDATION_DATASETS='[math500]'
 
 echo "Starting beta sweep for experiment: ${EXPERIMENT_NAME}"
 echo "Beta values: ${BETA_VALUES[@]}"
