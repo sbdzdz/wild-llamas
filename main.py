@@ -38,7 +38,6 @@ def main(cfg: DictConfig):
 
     setup_model_directory(cfg)
 
-    skipped_models = load_skipped_models()
     models = fetch_or_load_models(api, base_model_id)
 
     base_model_path = download(base_model_id)
@@ -104,40 +103,8 @@ def main(cfg: DictConfig):
         gc.collect()
         torch.cuda.empty_cache()
 
-        if model.id in skipped_models:
-            print(f"Skipping {model.id} (previously skipped)")
-            continue
-
-        if not is_approx_8b_params(model):
-            log_skipped_model(output_dir, model.id, "not_8b")
-            continue
-
-        if not is_bf16(model):
-            log_skipped_model(output_dir, model.id, "not_bf16")
-            continue
-
-        if not is_text_generation(model):
-            log_skipped_model(output_dir, model.id, "not_text")
-            continue
-
-        try:
-            download(model.id)
-        except Exception:
-            log_skipped_model(output_dir, model.id, "download_error")
-            continue
-
-        try:
-            current_model_state_dict = load(model.id)
-        except Exception:
-            log_skipped_model(output_dir, model.id, "load_error")
-            continue
-
-        if not state_dicts_match(base_state_dict, current_model_state_dict):
-            log_skipped_model(output_dir, model.id, "dtypes_mismatch")
-            continue
-
-        if are_nearly_equal(base_state_dict, current_model_state_dict):
-            log_skipped_model(output_dir, model.id, "nearly_equal")
+        current_model_state_dict = prefilter(model, base_state_dict, output_dir)
+        if current_model_state_dict is None:
             continue
 
         # In greedy mode, skip current model evaluation until we know if merge is accepted
@@ -309,7 +276,7 @@ def main(cfg: DictConfig):
         if models_considered >= cfg.model_limit:
             break
 
-    merge_skipped_models(output_dir)
+    update_skipped_models(output_dir)
 
 
 def set_up_eval_paths(model_id: str, output_root: Path) -> tuple[Path, Path]:
@@ -403,6 +370,48 @@ def save_all_models(model_ids):
     df.to_csv(all_models_file, index=False)
 
 
+def prefilter(model, base_state_dict, output_dir):
+    """Run prefilter checks on a candidate model. Returns state dict if it passes, None if skipped."""
+    skipped_models = load_skipped_models()
+    if model.id in skipped_models:
+        print(f"Skipping {model.id} (previously skipped)")
+        return None
+
+    if not is_approx_8b_params(model):
+        log_skipped_model(output_dir, model.id, "not_8b")
+        return None
+
+    if not is_bf16(model):
+        log_skipped_model(output_dir, model.id, "not_bf16")
+        return None
+
+    if not is_text_generation(model):
+        log_skipped_model(output_dir, model.id, "not_text")
+        return None
+
+    try:
+        download(model.id)
+    except Exception:
+        log_skipped_model(output_dir, model.id, "download_error")
+        return None
+
+    try:
+        current_model_state_dict = load(model.id)
+    except Exception:
+        log_skipped_model(output_dir, model.id, "load_error")
+        return None
+
+    if not state_dicts_match(base_state_dict, current_model_state_dict):
+        log_skipped_model(output_dir, model.id, "dtypes_mismatch")
+        return None
+
+    if are_nearly_equal(base_state_dict, current_model_state_dict):
+        log_skipped_model(output_dir, model.id, "nearly_equal")
+        return None
+
+    return current_model_state_dict
+
+
 def is_bf16(model):
     """Check if a model is bf16."""
     return model.safetensors is None or "BF16" in model.safetensors.parameters.keys()
@@ -423,6 +432,25 @@ def is_approx_8b_params(model):
         return 7_000_000_000 <= int(model.safetensors.total) <= 9_000_000_000
 
 
+def download(model_id):
+    """Download a model from HuggingFace Hub to a model-specific directory."""
+    model_name = model_id.replace("/", "--")
+    model_path = TOP_DIR / f"models/{model_name}"
+
+    if model_path.exists():
+        print(f"Model {model_id} already exists at {model_path}, skipping download.")
+        return model_path
+
+    print(f"Downloading {model_id} to {model_path}...")
+    snapshot_download(
+        repo_id=model_id,
+        local_dir=str(model_path),
+        max_workers=1,
+        local_dir_use_symlinks=False,
+    )
+    return model_path
+
+
 def are_nearly_equal(sd1, sd2):
     """Check if two state dictionaries are nearly equal."""
     for key in sd1.keys():
@@ -441,25 +469,6 @@ def state_dicts_match(sd1, sd2):
         if sd1[key].shape != sd2[key].shape:
             return False
     return True
-
-
-def download(model_id):
-    """Download a model from HuggingFace Hub to a model-specific directory."""
-    model_name = model_id.replace("/", "--")
-    model_path = TOP_DIR / f"models/{model_name}"
-
-    if model_path.exists():
-        print(f"Model {model_id} already exists at {model_path}, skipping download.")
-        return model_path
-
-    print(f"Downloading {model_id} to {model_path}...")
-    snapshot_download(
-        repo_id=model_id,
-        local_dir=str(model_path),
-        max_workers=1,
-        local_dir_use_symlinks=False,
-    )
-    return model_path
 
 
 def evaluate(
@@ -722,7 +731,7 @@ def log_skipped_model(output_root, model_id, reason):
         writer.writerow([model_id, reason])
 
 
-def merge_skipped_models(output_root):
+def update_skipped_models(output_root):
     """Merge run-local skipped_models.csv into the global skipped_models.csv."""
     run_skipped_file = Path(output_root) / "skipped_models.csv"
     if not run_skipped_file.exists():
