@@ -27,8 +27,8 @@ delete_dir() {
   fi
 }
 
-delete_file "skipped_models.csv"
-delete_file "all_models.csv"
+delete_file "data/skipped_models.csv"
+delete_file "data/all_models.csv"
 delete_file "outputs/opencompass/merge_log.csv"
 
 delete_dir "models/merged_model"

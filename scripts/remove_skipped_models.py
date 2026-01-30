@@ -11,7 +11,7 @@ from pathlib import Path
 WORK_DIR = Path(os.environ.get("WORK"))
 MODELS_DIR = WORK_DIR / "wild-llamas" / "models"
 REPO_DIR = Path(__file__).parent.parent.resolve()
-SKIPPED_CSV = REPO_DIR / "skipped_models.csv"
+SKIPPED_CSV = REPO_DIR / "data" / "skipped_models.csv"
 
 
 def read_skipped_models(csv_path):
