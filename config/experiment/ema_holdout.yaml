@@ -10,15 +10,13 @@ greedy: true
 eval_current: true
 eval_runs: 1
 greedy_eval_samples: 500
-model_limit: 150
+model_limit: 100
 
 selection_datasets:
   - math500
-  - mmlu
 
 validation_datasets:
   - gsm8k
-  - mmlu_pro
 
 merge:
   method: ema
