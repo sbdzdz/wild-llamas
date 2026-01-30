@@ -1,7 +1,7 @@
-"""Plot beta sweep results across model merging steps.
+"""Plot sweep results across model merging steps.
 
-Shows accuracy progression for different beta values, with each beta
-plotted as a separate line.
+Supports beta sweeps (EMA with different beta values) and method comparison
+(EMA vs weight averaging). Each variant is plotted as a separate line.
 """
 
 import argparse
@@ -34,14 +34,30 @@ DATASETS = {
     },
 }
 
+VARIANT_LABELS = {
+    "ema": "EMA",
+    "weight_averaging": "Weight Averaging",
+}
 
-def plot_beta_sweep_per_dataset(
+
+def format_variant_label(variant: str) -> str:
+    """Format variant string for display in legend."""
+    if variant.startswith("beta_"):
+        try:
+            beta_val = variant.split("beta_")[-1]
+            return f"β={beta_val}"
+        except (IndexError, ValueError):
+            pass
+    return VARIANT_LABELS.get(variant, variant.replace("_", " ").title())
+
+
+def plot_sweep_per_dataset(
     base_dir, experiment_name, ylim=None, dataset_type="selection"
 ):
-    """Create separate plots for each dataset showing all beta values.
+    """Create separate plots for each dataset showing all variants.
 
     Args:
-        base_dir: Base directory containing beta sweep results
+        base_dir: Base directory containing sweep results
         experiment_name: Name of the experiment (e.g., "ema_holdout")
         ylim: Optional y-axis limits as tuple (min, max)
         dataset_type: Either "selection" or "validation"
@@ -50,28 +66,25 @@ def plot_beta_sweep_per_dataset(
     figures_dir = (Path(__file__) / "../../figures").resolve()
     figures_dir.mkdir(exist_ok=True)
 
-    # Load data for all beta values
-    beta_data = load_all_beta_data(base_dir, experiment_name, dataset_type)
+    sweep_data = load_all_sweep_data(base_dir, experiment_name, dataset_type)
 
-    if not beta_data:
+    if not sweep_data:
         print(f"No data found for experiment: {experiment_name}")
         return
 
-    # Create plot for each dataset
     for dataset_info in DATASETS.values():
         prefix = dataset_info["prefix"]
         display_name = dataset_info["display_name"]
 
-        # Check if any beta has data for this dataset
         has_data = any(
-            prefix in beta_dict["data"] for beta_dict in beta_data.values()
+            prefix in variant_dict["data"] for variant_dict in sweep_data.values()
         )
         if not has_data:
             print(f"No data found for {display_name}")
             continue
 
-        plot_beta_comparison(
-            beta_data=beta_data,
+        plot_variant_comparison(
+            sweep_data=sweep_data,
             dataset_prefix=prefix,
             dataset_name=display_name,
             ylim=ylim,
@@ -88,39 +101,40 @@ def plot_beta_sweep_per_dataset(
         print(f"Saved: {output_path.relative_to(figures_dir.parent)}")
 
 
-def load_all_beta_data(base_dir, experiment_name, dataset_type="selection"):
-    """Load accuracy data for all beta values.
+def load_all_sweep_data(base_dir, experiment_name, dataset_type="selection"):
+    """Load accuracy data for all sweep variants.
+
+    Discovers variants from directory names: {experiment_name}_{variant}.
+    Supports beta sweeps (beta_0.5) and method comparison (ema, weight_averaging).
 
     Returns:
-        dict: Mapping from beta (float) to dict containing:
+        dict: Mapping from variant (str) to dict containing:
             - "data": dict mapping dataset prefix to (steps, means, stds)
     """
     base_dir = Path(base_dir)
-    beta_dirs = sorted(base_dir.glob(f"{experiment_name}_beta_*"))
+    variant_dirs = sorted(
+        [d for d in base_dir.iterdir() if d.is_dir() and d.name.startswith(f"{experiment_name}_")]
+    )
 
-    if not beta_dirs:
+    if not variant_dirs:
         return {}
 
-    beta_data = {}
+    sweep_data = {}
 
-    for beta_dir in beta_dirs:
+    for variant_dir in variant_dirs:
+        variant = variant_dir.name[len(experiment_name) + 1 :]
+
         try:
-            beta_str = beta_dir.name.split("beta_")[-1]
-            beta = float(beta_str)
-
-            # Determine which results directory to load
             if dataset_type == "validation":
-                results_dir = beta_dir / "results/merged_model_validation"
+                results_dir = variant_dir / "results/merged_model_validation"
             else:
-                results_dir = beta_dir / "results/merged_model"
+                results_dir = variant_dir / "results/merged_model"
 
             if not results_dir.exists():
                 continue
 
-            # Load all step data for this beta
             df = load_summary_data(results_dir)
 
-            # Extract data for each dataset
             dataset_data = {}
             for dataset_info in DATASETS.values():
                 prefix = dataset_info["prefix"]
@@ -131,13 +145,13 @@ def load_all_beta_data(base_dir, experiment_name, dataset_type="selection"):
                     dataset_data[prefix] = (steps, means, stds)
 
             if dataset_data:
-                beta_data[beta] = {"data": dataset_data}
+                sweep_data[variant] = {"data": dataset_data}
 
         except Exception as e:
-            print(f"Warning: Could not load beta {beta_str}: {e}")
+            print(f"Warning: Could not load variant {variant}: {e}")
             continue
 
-    return beta_data
+    return sweep_data
 
 
 def load_summary_data(results_dir):
@@ -233,11 +247,25 @@ def compute_run_aggregate_mean_std(df):
     return float(mean_accuracy), float(std_accuracy)
 
 
-def plot_beta_comparison(beta_data, dataset_prefix, dataset_name, ylim=None):
-    """Plot accuracy comparison across beta values for a single dataset.
+def sort_variants(variants):
+    """Sort variants for consistent plot order (betas numerically, methods by label)."""
+    beta_variants = [v for v in variants if v.startswith("beta_")]
+    other_variants = [v for v in variants if not v.startswith("beta_")]
+
+    def beta_sort_key(v):
+        try:
+            return float(v.split("beta_")[-1])
+        except (IndexError, ValueError):
+            return 0.0
+
+    return sorted(beta_variants, key=beta_sort_key) + sorted(other_variants)
+
+
+def plot_variant_comparison(sweep_data, dataset_prefix, dataset_name, ylim=None):
+    """Plot accuracy comparison across variants for a single dataset.
 
     Args:
-        beta_data: dict mapping beta to {"data": {prefix: (steps, means, stds)}}
+        sweep_data: dict mapping variant to {"data": {prefix: (steps, means, stds)}}
         dataset_prefix: Prefix to identify the dataset
         dataset_name: Display name for the dataset
         ylim: Optional y-axis limits as tuple
@@ -245,23 +273,22 @@ def plot_beta_comparison(beta_data, dataset_prefix, dataset_name, ylim=None):
     plt.figure(figsize=(10, 6))
 
     cmap = plt.get_cmap("Dark2")
-    sorted_betas = sorted(beta_data.keys())
+    sorted_variants = sort_variants(sweep_data.keys())
 
-    # Plot each beta value as a separate line
-    for idx, beta in enumerate(sorted_betas):
-        beta_info = beta_data[beta]
-        if dataset_prefix not in beta_info["data"]:
+    for idx, variant in enumerate(sorted_variants):
+        variant_info = sweep_data[variant]
+        if dataset_prefix not in variant_info["data"]:
             continue
 
-        steps, means, stds = beta_info["data"][dataset_prefix]
+        steps, means, stds = variant_info["data"][dataset_prefix]
         color = cmap(idx % 8)
+        label = format_variant_label(variant)
 
         valid_indices = ~np.isnan(means)
         valid_steps = np.array(steps)[valid_indices]
         valid_means = np.array(means)[valid_indices]
         valid_stds = np.array(stds)[valid_indices]
 
-        # Plot line and shaded std region
         plt.plot(
             valid_steps,
             valid_means,
@@ -269,7 +296,7 @@ def plot_beta_comparison(beta_data, dataset_prefix, dataset_name, ylim=None):
             linewidth=2,
             color=color,
             alpha=0.8,
-            label=f"β={beta}",
+            label=label,
             zorder=2,
         )
 
@@ -283,7 +310,6 @@ def plot_beta_comparison(beta_data, dataset_prefix, dataset_name, ylim=None):
             linewidth=0,
         )
 
-        # Add markers
         plt.scatter(
             valid_steps,
             valid_means,
@@ -296,7 +322,7 @@ def plot_beta_comparison(beta_data, dataset_prefix, dataset_name, ylim=None):
 
     plt.xlabel("Number of merged models", fontsize=12)
     plt.ylabel("Accuracy (%)", fontsize=12)
-    plt.title(f"{dataset_name} - Beta Comparison", fontsize=14, fontweight="bold")
+    plt.title(f"{dataset_name} - Comparison", fontsize=14, fontweight="bold")
     plt.legend(fontsize=11)
     plt.grid(axis="x", visible=False)
     plt.grid(axis="y", alpha=0.3)
@@ -308,7 +334,7 @@ def plot_beta_comparison(beta_data, dataset_prefix, dataset_name, ylim=None):
 def main():
     """Main function to load data and create plots."""
     parser = argparse.ArgumentParser(
-        description="Plot beta sweep results across model merging steps."
+        description="Plot sweep results (beta sweep or method comparison) across model merging steps."
     )
 
     parser.add_argument(
@@ -320,7 +346,7 @@ def main():
         "--base-dir",
         type=str,
         default="outputs/beta_sweep",
-        help="Base directory containing beta sweep results (default: outputs/beta_sweep)",
+        help="Base directory containing sweep results (default: outputs/beta_sweep)",
     )
     parser.add_argument(
         "--ylim",
@@ -340,7 +366,7 @@ def main():
     ylim = tuple(args.ylim) if args.ylim is not None else None
     dataset_type = "selection" if args.selection else "validation"
 
-    plot_beta_sweep_per_dataset(
+    plot_sweep_per_dataset(
         base_dir=args.base_dir,
         experiment_name=args.experiment_name,
         ylim=ylim,

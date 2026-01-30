@@ -31,13 +31,6 @@ for DIR in ${BETA_DIRS}; do
 done
 echo ""
 
-# Create summary CSV
-SUMMARY_FILE="${BASE_DIR}/${EXPERIMENT_NAME}_summary.csv"
-echo "Creating summary file: ${SUMMARY_FILE}"
-
-# Write header
-echo "beta,final_selection_acc,final_validation_acc,num_models_merged,final_step" > ${SUMMARY_FILE}
-
 # Extract results from each run
 echo ""
 echo "Results Summary:"
@@ -73,20 +66,16 @@ for DIR in ${BETA_DIRS}; do
     NUM_MERGED=${NUM_MERGED:-0}
     FINAL_STEP=${FINAL_STEP:-0}
 
-    # Write to CSV
-    echo "${BETA},${SELECTION_ACC},${VALIDATION_ACC},${NUM_MERGED},${FINAL_STEP}" >> ${SUMMARY_FILE}
-
     # Print formatted row
     printf "%-8s %-20s %-20s %-18s %-12s\n" "${BETA}" "${SELECTION_ACC}" "${VALIDATION_ACC}" "${NUM_MERGED}" "${FINAL_STEP}"
 done
 
 echo ""
 echo "========================================="
-echo "Summary saved to: ${SUMMARY_FILE}"
 echo ""
 echo "To visualize results, run:"
-echo "  python plotting/plot_beta_sweep.py ${EXPERIMENT_NAME}              # Validation datasets (default)"
-echo "  python plotting/plot_beta_sweep.py ${EXPERIMENT_NAME} --selection  # Selection datasets"
+echo "  python plotting/plot_sweep_results.py ${EXPERIMENT_NAME}              # Validation datasets (default)"
+echo "  python plotting/plot_sweep_results.py ${EXPERIMENT_NAME} --selection  # Selection datasets"
 echo ""
 echo "Or view individual merge logs:"
 for DIR in ${BETA_DIRS}; do
