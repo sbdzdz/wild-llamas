@@ -94,11 +94,13 @@ def main(cfg: DictConfig):
     )
     merged_state_dict = deepcopy(base_model.state_dict())
     merging_step = 0
+    models_considered = 0
 
     merger = create_merge_instance(cfg)
     merger.update(merged_state_dict)
 
     for model in models:
+        models_considered += 1
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -262,7 +264,7 @@ def main(cfg: DictConfig):
             save(base_model, merged_model_path)
             should_eval = (
                 merging_step % cfg.eval_every_n_merges == 0
-                or merging_step == cfg.model_limit
+                or models_considered >= cfg.model_limit
             )
             if should_eval:
                 merged_eval_dir = (
@@ -304,7 +306,7 @@ def main(cfg: DictConfig):
                 num_eval_samples=None,
             )
 
-        if merging_step >= cfg.model_limit:
+        if models_considered >= cfg.model_limit:
             break
 
     merge_skipped_models(output_dir)
