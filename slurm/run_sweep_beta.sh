@@ -5,14 +5,9 @@
 EXPERIMENT_NAME=${1:-"ema_holdout"}
 BETA_VALUES=(0.1 0.3 0.5 0.7 0.9)
 
-# Selection and validation datasets
-SELECTION_DATASETS='[gsm8k]'
-VALIDATION_DATASETS='[math500]'
-
 echo "Starting beta sweep for experiment: ${EXPERIMENT_NAME}"
 echo "Beta values: ${BETA_VALUES[@]}"
-echo "Selection datasets: ${SELECTION_DATASETS}"
-echo "Validation datasets: ${VALIDATION_DATASETS}"
+echo "Datasets from experiment config (ema_holdout.yaml)"
 echo ""
 
 # Submit jobs for each beta value
@@ -26,8 +21,6 @@ for BETA in "${BETA_VALUES[@]}"; do
         slurm/run_ferranti_multi_gpu.sh \
         experiment=${EXPERIMENT_NAME} \
         merge.ema.beta=${BETA} \
-        selection_datasets=${SELECTION_DATASETS} \
-        validation_datasets=${VALIDATION_DATASETS} \
         output_dir=${OUTPUT_DIR})
 
     # Extract job ID from sbatch output
@@ -45,4 +38,4 @@ echo "Check specific job: squeue -j <JOB_ID>"
 echo "Cancel all: scancel ${JOB_IDS[@]}"
 echo ""
 echo "After completion, analyze results with:"
-echo "  scripts/analyze_beta_sweep.sh ${EXPERIMENT_NAME}"
+echo "  scripts/analyze_sweep_beta.sh ${EXPERIMENT_NAME}"

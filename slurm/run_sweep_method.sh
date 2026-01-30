@@ -2,17 +2,14 @@
 # SLURM batch submission script for EMA vs Weight Averaging sweep
 # Usage: ./run_method_sweep_slurm.sh [experiment_name]
 #
-# Runs ema_holdout experiment with math500 selection and gsm8k validation,
-# comparing EMA (beta=0.5) to weight averaging.
+# Runs ema_holdout experiment, comparing EMA (beta=0.5) to weight averaging.
+# Datasets from experiment config (ema_holdout.yaml).
 
 EXPERIMENT_NAME=${1:-"ema_holdout"}
-SELECTION_DATASETS='[math500]'
-VALIDATION_DATASETS='[gsm8k]'
 
 echo "Starting method sweep for experiment: ${EXPERIMENT_NAME}"
 echo "Methods: EMA (beta=0.5), Weight Averaging"
-echo "Selection datasets: ${SELECTION_DATASETS}"
-echo "Validation datasets: ${VALIDATION_DATASETS}"
+echo "Datasets from experiment config (ema_holdout.yaml)"
 echo ""
 
 JOB_IDS=()
@@ -26,8 +23,6 @@ JOB_OUTPUT=$(sbatch \
     experiment=${EXPERIMENT_NAME} \
     merge.method=ema \
     merge.ema.beta=0.5 \
-    selection_datasets=${SELECTION_DATASETS} \
-    validation_datasets=${VALIDATION_DATASETS} \
     output_dir=${OUTPUT_DIR})
 JOB_ID=$(echo $JOB_OUTPUT | grep -oP '\d+')
 JOB_IDS+=($JOB_ID)
@@ -42,8 +37,6 @@ JOB_OUTPUT=$(sbatch \
     slurm/run_ferranti_multi_gpu.sh \
     experiment=${EXPERIMENT_NAME} \
     merge.method=weight_averaging_running \
-    selection_datasets=${SELECTION_DATASETS} \
-    validation_datasets=${VALIDATION_DATASETS} \
     output_dir=${OUTPUT_DIR})
 JOB_ID=$(echo $JOB_OUTPUT | grep -oP '\d+')
 JOB_IDS+=($JOB_ID)
@@ -58,7 +51,7 @@ echo "Check specific job: squeue -j <JOB_ID>"
 echo "Cancel all: scancel ${JOB_IDS[@]}"
 echo ""
 echo "After completion, analyze results with:"
-echo "  scripts/analyze_method_sweep.sh ${EXPERIMENT_NAME}"
+echo "  scripts/analyze_sweep_method.sh ${EXPERIMENT_NAME}"
 echo ""
 echo "To visualize:"
 echo "  python plotting/plot_sweep_results.py ${EXPERIMENT_NAME} --base-dir outputs/method_sweep"
