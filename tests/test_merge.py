@@ -200,6 +200,76 @@ def test_ema_incremental_validation():
     print("✓ EMA validation correctly rejects mismatched keys")
 
 
+def test_unmerge_weight_averaging():
+    """Test unmerge logic: after rejecting a merge, result equals merging without that model.
+
+    Simulates main.py greedy rejection flow for WeightAveragingIncremental.
+    """
+    from copy import deepcopy
+
+    base = create_random_state_dict(num_params=3, param_size=(10, 10), seed=0)
+    model1 = create_random_state_dict(num_params=3, param_size=(10, 10), seed=1)
+    model2 = create_random_state_dict(num_params=3, param_size=(10, 10), seed=2)
+    model3 = create_random_state_dict(num_params=3, param_size=(10, 10), seed=3)
+
+    merger = WeightAveragingIncremental()
+    merger.update(base)
+
+    merged_state_dict = merger.update(model1)
+    previous_merged_state_dict = deepcopy(merged_state_dict)
+    previous_step_count = merger.step_count
+
+    merger.update(model2)
+
+    merged_state_dict = previous_merged_state_dict
+    merger.current_average = deepcopy(previous_merged_state_dict)
+    merger.step_count = previous_step_count
+
+    merged_state_dict = merger.update(model3)
+
+    expected = WeightAveraging().merge([base, model1, model3])
+    for key in expected.keys():
+        assert torch.allclose(
+            merged_state_dict[key], expected[key], rtol=1e-5, atol=1e-7
+        ), f"Unmerge mismatch at {key}"
+
+
+def test_unmerge_ema():
+    """Test unmerge logic for EMA: after rejecting a merge, subsequent merges are correct.
+
+    Simulates main.py greedy rejection flow for EMAIncremental.
+    """
+    from copy import deepcopy
+
+    beta = 0.9
+    base = create_random_state_dict(num_params=3, param_size=(10, 10), seed=0)
+    model1 = create_random_state_dict(num_params=3, param_size=(10, 10), seed=1)
+    model2 = create_random_state_dict(num_params=3, param_size=(10, 10), seed=2)
+    model3 = create_random_state_dict(num_params=3, param_size=(10, 10), seed=3)
+
+    merger = EMAIncremental(beta=beta)
+    merger.update(base)
+
+    merged_state_dict = merger.update(model1)
+    previous_merged_state_dict = deepcopy(merged_state_dict)
+    previous_step_count = merger.step_count
+
+    merger.update(model2)
+
+    merged_state_dict = previous_merged_state_dict
+    merger.current_average = deepcopy(previous_merged_state_dict)
+    merger.step_count = previous_step_count
+
+    merged_state_dict = merger.update(model3)
+
+    ema_12 = {k: beta * base[k] + (1 - beta) * model1[k] for k in base.keys()}
+    expected = {k: beta * ema_12[k] + (1 - beta) * model3[k] for k in base.keys()}
+    for key in expected.keys():
+        assert torch.allclose(
+            merged_state_dict[key], expected[key], rtol=1e-5, atol=1e-7
+        ), f"EMA unmerge mismatch at {key}"
+
+
 if __name__ == "__main__":
     test_weight_averaging_incremental_vs_batch()
     test_weight_averaging_incremental_different_sizes()
@@ -209,4 +279,6 @@ if __name__ == "__main__":
     test_ema_incremental_multiple_updates()
     test_ema_incremental_different_betas()
     test_ema_incremental_validation()
+    test_unmerge_weight_averaging()
+    test_unmerge_ema()
     print("\n✓ All tests passed!")
