@@ -1,11 +1,12 @@
 # @package _global_
 
-# Experiment: EMA with held-out validation set (FLIPPED)
+# Experiment: Greedy merging with held-out validation set (FLIPPED)
 # Uses selection_datasets for greedy accept/reject decisions
 # Uses validation_datasets to monitor for overfitting (not used for selection)
-# FLIPPED: GSM8K for selection, Math-500 for validation (opposite of ema_holdout)
+# FLIPPED: GSM8K for selection, Math-500 for validation (opposite of greedy_holdout)
+# Default merge method: EMA (can be overridden via command line)
 
-output_dir: "outputs/experiment/ema_holdout_flipped"
+output_dir: "outputs/experiment/greedy_holdout_flipped"
 
 greedy: true
 eval_current: true

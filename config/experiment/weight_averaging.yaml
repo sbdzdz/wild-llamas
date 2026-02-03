@@ -1,7 +1,7 @@
 # @package _global_
 
 # Experiment: Weight Averaging (Incremental)
-# Uses WeightAveragingIncremental class from wildllamas/merge.py
+# Uses WeightAveragingRunning class from wildllamas/merge.py
 
 output_dir: "outputs/experiment/weight_averaging"
 
